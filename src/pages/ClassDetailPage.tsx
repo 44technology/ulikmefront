@@ -91,8 +91,14 @@ const ClassDetailPage = () => {
 
     // Free class - enroll directly
     try {
-      await enrollInClass.mutateAsync(id!);
+      const enrollment = await enrollInClass.mutateAsync(id!);
       toast.success('Successfully enrolled in class!');
+      
+      // Show QR code ticket if available (from enrollment response)
+      if (enrollment?.ticket) {
+        setCreatedTicket(enrollment.ticket);
+        setShowTicketDialog(true);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to enroll');
     }

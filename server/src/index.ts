@@ -18,6 +18,7 @@ import suggestionRoutes from './routes/suggestionRoutes.js';
 import storyRoutes from './routes/storyRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
 
 dotenv.config();
 
@@ -175,6 +176,7 @@ app.use('/api/suggestions', suggestionRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // 404 handler
 app.use((req, res) => {
