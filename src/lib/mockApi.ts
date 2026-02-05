@@ -1484,9 +1484,10 @@ export const mockApiRequest = async <T = any>(
         setStorage(MEETUP_STORAGE_KEY, meetups);
       }
       
-      // Generate QR code ticket if meetup has physical location
+      // Generate QR code ticket if meetup has physical location (venue or coordinates)
+      // Ticket is needed for onsite events/activities that require check-in
       let ticket = null;
-      const hasPhysicalLocation = meetup.latitude && meetup.longitude;
+      const hasPhysicalLocation = meetup.venueId || (meetup.latitude && meetup.longitude) || meetup.location;
       
       if (hasPhysicalLocation) {
         const ticketNumber = `TKT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
@@ -1948,8 +1949,9 @@ export const mockApiRequest = async <T = any>(
       };
       
       // Generate QR code ticket if class has physical location
+      // Check if class has venue OR has latitude/longitude coordinates
       let ticket = null;
-      const hasPhysicalLocation = cls.latitude && cls.longitude;
+      const hasPhysicalLocation = cls.venueId || cls.venue?.id || (cls.latitude && cls.longitude);
       
       if (hasPhysicalLocation) {
         const ticketNumber = `TKT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;

@@ -123,8 +123,18 @@ const TicketDetailPage = () => {
             >
               {qrCodeVisible ? (
                 <div className="text-center space-y-2">
-                  <QrCode className="w-48 h-48 mx-auto text-foreground" />
-                  <p className="text-xs font-mono text-muted-foreground break-all">{ticket.qrCode}</p>
+                  {ticket.qrCode ? (
+                    <QRCodeDisplay 
+                      value={ticket.qrCode} 
+                      size={200}
+                      className="rounded-lg"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No QR code available</p>
+                  )}
+                  {ticket.qrCode && (
+                    <p className="text-xs font-mono text-muted-foreground break-all mt-2">{ticket.qrCode}</p>
+                  )}
                 </div>
               ) : (
                 <div className="text-center space-y-2">

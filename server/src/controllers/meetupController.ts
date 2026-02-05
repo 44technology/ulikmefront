@@ -34,6 +34,10 @@ export const createMeetup = async (
       imageUrl = await uploadToCloudinary(req.file);
     }
 
+    // If venueId is provided, status should be PENDING_APPROVAL
+    const status = venueId ? 'PENDING_APPROVAL' : 'UPCOMING';
+    const venueApprovalStatus = venueId ? 'pending' : null;
+
     const meetup = await prisma.meetup.create({
       data: {
         title,
@@ -53,6 +57,8 @@ export const createMeetup = async (
         isFree: isFree !== undefined ? isFree : true,
         pricePerPerson: pricePerPerson || null,
         isBlindMeet: isBlindMeet || false,
+        status,
+        venueApprovalStatus,
       },
       include: {
         creator: {
@@ -84,6 +90,177 @@ export const createMeetup = async (
     res.status(201).json({
       success: true,
       data: meetup,
+      message: venueId 
+        ? 'Activity created! Waiting for venue approval.' 
+        : 'Activity created successfully!',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve or reject meetup by venue
+ * PUT /api/meetups/:id/venue-approval
+ */
+export const approveMeetupByVenue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { action, approvedPrice, rejectionReason } = req.body; // action: 'approve' | 'reject'
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      throw new AppError('Invalid action. Must be "approve" or "reject"', 400);
+    }
+
+    const meetup = await prisma.meetup.findUnique({
+      where: { id },
+      include: {
+        venue: true,
+        creator: true,
+      },
+    });
+
+    if (!meetup) {
+      throw new AppError('Meetup not found', 404);
+    }
+
+    // Verify that the requester is the venue owner
+    if (meetup.venueId !== req.userId) {
+      throw new AppError('Unauthorized: Only venue owner can approve/reject', 403);
+    }
+
+    if (meetup.status !== 'PENDING_APPROVAL') {
+      throw new AppError('Meetup is not pending approval', 400);
+    }
+
+    if (action === 'approve') {
+      // If approvedPrice is provided, use it; otherwise use user's requested price
+      const finalPrice = approvedPrice !== undefined ? approvedPrice : meetup.pricePerPerson;
+
+      const updatedMeetup = await prisma.meetup.update({
+        where: { id },
+        data: {
+          status: 'UPCOMING',
+          venueApprovalStatus: 'approved',
+          venueApprovedPrice: finalPrice,
+          pricePerPerson: finalPrice, // Update the actual price
+        },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+              avatar: true,
+            },
+          },
+          venue: true,
+        },
+      });
+
+      // TODO: Send notification to creator that activity was approved
+      // await sendNotification(meetup.creatorId, {
+      //   type: 'ACTIVITY_APPROVED',
+      //   message: `Your activity "${meetup.title}" has been approved by ${meetup.venue?.name}`,
+      //   meetupId: id,
+      // });
+
+      res.json({
+        success: true,
+        data: updatedMeetup,
+        message: 'Activity approved successfully',
+      });
+    } else {
+      // Reject
+      const updatedMeetup = await prisma.meetup.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          venueApprovalStatus: 'rejected',
+          venueRejectionReason: rejectionReason || null,
+        },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+              avatar: true,
+            },
+          },
+          venue: true,
+        },
+      });
+
+      // TODO: Send notification to creator that activity was rejected
+      // await sendNotification(meetup.creatorId, {
+      //   type: 'ACTIVITY_REJECTED',
+      //   message: `Your activity "${meetup.title}" was rejected by ${meetup.venue?.name}`,
+      //   meetupId: id,
+      //   reason: rejectionReason,
+      // });
+
+      res.json({
+        success: true,
+        data: updatedMeetup,
+        message: 'Activity rejected',
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get pending meetups for venue
+ * GET /api/meetups/venue/pending
+ */
+export const getPendingMeetupsForVenue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const venueId = req.userId; // Assuming venue user ID
+
+    const pendingMeetups = await prisma.meetup.findMany({
+      where: {
+        venueId,
+        status: 'PENDING_APPROVAL',
+        venueApprovalStatus: 'pending',
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            avatar: true,
+          },
+        },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json({
+      success: true,
+      data: pendingMeetups,
     });
   } catch (error) {
     next(error);
@@ -110,7 +287,17 @@ export const getMeetup = async (
             avatar: true,
           },
         },
-        venue: true,
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            image: true,
+            rating: true,
+            reviewCount: true,
+          },
+        },
         members: {
           include: {
             user: {
@@ -122,6 +309,11 @@ export const getMeetup = async (
                 avatar: true,
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            members: true,
           },
         },
       },
@@ -140,6 +332,220 @@ export const getMeetup = async (
   }
 };
 
+export const getMeetups = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { category, status, search, latitude, longitude, radius } = req.query;
+
+    const where: any = {};
+
+    // Filter by category
+    if (category) {
+      where.category = category as string;
+    }
+
+    // Filter by status (exclude pending/rejected for regular users)
+    if (status) {
+      where.status = status as string;
+    } else {
+      // Default: only show approved/upcoming meetups
+      where.status = {
+        in: ['UPCOMING', 'ONGOING'],
+      };
+    }
+
+    // Search by title or description
+    if (search) {
+      where.OR = [
+        { title: { contains: search as string, mode: 'insensitive' } },
+        { description: { contains: search as string, mode: 'insensitive' } },
+      ];
+    }
+
+    // Filter by location if coordinates provided
+    if (latitude && longitude && radius) {
+      const lat = parseFloat(latitude as string);
+      const lng = parseFloat(longitude as string);
+      const rad = parseFloat(radius as string);
+
+      const box = getBoundingBox(lat, lng, rad);
+
+      where.latitude = {
+        gte: box.minLat,
+        lte: box.maxLat,
+      };
+      where.longitude = {
+        gte: box.minLng,
+        lte: box.maxLng,
+      };
+    }
+
+    const meetups = await prisma.meetup.findMany({
+      where,
+      include: {
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            avatar: true,
+          },
+        },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            image: true,
+            rating: true,
+            reviewCount: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+          },
+        },
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
+    });
+
+    // Calculate distance if coordinates provided
+    let meetupsWithDistance = meetups;
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude as string);
+      const lng = parseFloat(longitude as string);
+
+      meetupsWithDistance = meetups.map((meetup) => {
+        if (meetup.latitude && meetup.longitude) {
+          const distance = calculateDistance(
+            lat,
+            lng,
+            meetup.latitude,
+            meetup.longitude
+          );
+          return { ...meetup, distance };
+        }
+        return meetup;
+      });
+
+      // Sort by distance
+      meetupsWithDistance.sort((a: any, b: any) => {
+        if (!a.distance) return 1;
+        if (!b.distance) return -1;
+        return a.distance - b.distance;
+      });
+    }
+
+    res.json({
+      success: true,
+      data: meetupsWithDistance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getNearbyMeetups = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { latitude, longitude, radius = '10' } = req.query;
+
+    if (!latitude || !longitude) {
+      throw new AppError('Latitude and longitude are required', 400);
+    }
+
+    const lat = parseFloat(latitude as string);
+    const lng = parseFloat(longitude as string);
+    const rad = parseFloat(radius as string);
+
+    const box = getBoundingBox(lat, lng, rad);
+
+    const meetups = await prisma.meetup.findMany({
+      where: {
+        latitude: {
+          gte: box.minLat,
+          lte: box.maxLat,
+        },
+        longitude: {
+          gte: box.minLng,
+          lte: box.maxLng,
+        },
+        status: {
+          in: ['UPCOMING', 'ONGOING'],
+        },
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            avatar: true,
+          },
+        },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            image: true,
+            rating: true,
+            reviewCount: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+          },
+        },
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
+    });
+
+    // Calculate distance and sort
+    const meetupsWithDistance = meetups.map((meetup) => {
+      if (meetup.latitude && meetup.longitude) {
+        const distance = calculateDistance(
+          lat,
+          lng,
+          meetup.latitude,
+          meetup.longitude
+        );
+        return { ...meetup, distance };
+      }
+      return meetup;
+    });
+
+    meetupsWithDistance.sort((a: any, b: any) => {
+      if (!a.distance) return 1;
+      if (!b.distance) return -1;
+      return a.distance - b.distance;
+    });
+
+    res.json({
+      success: true,
+      data: meetupsWithDistance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateMeetup = async (
   req: AuthRequest,
   res: Response,
@@ -147,6 +553,22 @@ export const updateMeetup = async (
 ) => {
   try {
     const { id } = req.params;
+    const {
+      title,
+      description,
+      startTime,
+      endTime,
+      maxAttendees,
+      category,
+      tags,
+      latitude,
+      longitude,
+      location,
+      isPublic,
+      isFree,
+      pricePerPerson,
+      isBlindMeet,
+    } = req.body;
 
     const meetup = await prisma.meetup.findUnique({
       where: { id },
@@ -156,28 +578,17 @@ export const updateMeetup = async (
       throw new AppError('Meetup not found', 404);
     }
 
+    // Only creator can update
     if (meetup.creatorId !== req.userId) {
-      throw new AppError('Not authorized to update this meetup', 403);
+      throw new AppError('Unauthorized', 403);
     }
 
-    const {
-      title,
-      description,
-      startTime,
-      endTime,
-      maxAttendees,
-      category,
-      tags,
-      venueId,
-      latitude,
-      longitude,
-      location,
-      isPublic,
-      isFree,
-      pricePerPerson,
-      isBlindMeet,
-      status,
-    } = req.body;
+    // If updating price and venueId exists, reset approval status
+    let updateData: any = {};
+    if (pricePerPerson !== undefined && meetup.venueId) {
+      updateData.venueApprovalStatus = 'pending';
+      updateData.status = 'PENDING_APPROVAL';
+    }
 
     let imageUrl = meetup.image;
     if (req.file) {
@@ -187,23 +598,22 @@ export const updateMeetup = async (
     const updatedMeetup = await prisma.meetup.update({
       where: { id },
       data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(imageUrl && { image: imageUrl }),
-        ...(startTime && { startTime: new Date(startTime) }),
-        ...(endTime && { endTime: new Date(endTime) }),
-        ...(maxAttendees !== undefined && { maxAttendees }),
-        ...(category !== undefined && { category }),
-        ...(tags && { tags }),
-        ...(venueId !== undefined && { venueId }),
-        ...(latitude !== undefined && { latitude }),
-        ...(longitude !== undefined && { longitude }),
-        ...(location !== undefined && { location }),
-        ...(isPublic !== undefined && { isPublic }),
-        ...(isFree !== undefined && { isFree }),
-        ...(pricePerPerson !== undefined && { pricePerPerson }),
-        ...(isBlindMeet !== undefined && { isBlindMeet }),
-        ...(status && { status }),
+        ...updateData,
+        title: title || meetup.title,
+        description: description !== undefined ? description : meetup.description,
+        image: imageUrl,
+        startTime: startTime ? new Date(startTime) : meetup.startTime,
+        endTime: endTime !== undefined ? (endTime ? new Date(endTime) : null) : meetup.endTime,
+        maxAttendees: maxAttendees !== undefined ? maxAttendees : meetup.maxAttendees,
+        category: category !== undefined ? category : meetup.category,
+        tags: tags !== undefined ? tags : meetup.tags,
+        latitude: latitude !== undefined ? latitude : meetup.latitude,
+        longitude: longitude !== undefined ? longitude : meetup.longitude,
+        location: location !== undefined ? location : meetup.location,
+        isPublic: isPublic !== undefined ? isPublic : meetup.isPublic,
+        isFree: isFree !== undefined ? isFree : meetup.isFree,
+        pricePerPerson: pricePerPerson !== undefined ? pricePerPerson : meetup.pricePerPerson,
+        isBlindMeet: isBlindMeet !== undefined ? isBlindMeet : meetup.isBlindMeet,
       },
       include: {
         creator: {
@@ -257,8 +667,9 @@ export const deleteMeetup = async (
       throw new AppError('Meetup not found', 404);
     }
 
+    // Only creator can delete
     if (meetup.creatorId !== req.userId) {
-      throw new AppError('Not authorized to delete this meetup', 403);
+      throw new AppError('Unauthorized', 403);
     }
 
     await prisma.meetup.delete({
@@ -268,197 +679,6 @@ export const deleteMeetup = async (
     res.json({
       success: true,
       message: 'Meetup deleted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getMeetups = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { 
-      category, 
-      status, 
-      search,
-      isFree,
-      isPublic,
-      isBlindMeet,
-      priceMin,
-      priceMax,
-      latitude,
-      longitude,
-      radius,
-      limit = 20, 
-      offset = 0 
-    } = req.query;
-
-    const where: any = {};
-
-    if (category) {
-      where.category = category as string;
-    }
-
-    if (status) {
-      where.status = status as any;
-    }
-
-    if (isFree !== undefined) {
-      where.isFree = isFree === 'true';
-    }
-
-    if (isPublic !== undefined) {
-      where.isPublic = isPublic === 'true';
-    }
-
-    if (isBlindMeet !== undefined) {
-      where.isBlindMeet = isBlindMeet === 'true';
-    }
-
-    if (priceMin || priceMax) {
-      where.pricePerPerson = {};
-      if (priceMin) where.pricePerPerson.gte = Number(priceMin);
-      if (priceMax) where.pricePerPerson.lte = Number(priceMax);
-    }
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search as string, mode: 'insensitive' } },
-        { description: { contains: search as string, mode: 'insensitive' } },
-        { location: { contains: search as string, mode: 'insensitive' } },
-        { tags: { has: search as string } },
-      ];
-    }
-
-    // Location-based filtering
-    if (latitude && longitude && radius) {
-      const lat = Number(latitude);
-      const lon = Number(longitude);
-      const radiusKm = Number(radius);
-
-      if (!isNaN(lat) && !isNaN(lon) && !isNaN(radiusKm)) {
-        const bbox = getBoundingBox(lat, lon, radiusKm);
-        where.latitude = { gte: bbox.minLat, lte: bbox.maxLat };
-        where.longitude = { gte: bbox.minLon, lte: bbox.maxLon };
-      }
-    }
-
-    const meetups = await prisma.meetup.findMany({
-      where,
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            displayName: true,
-            avatar: true,
-          },
-        },
-        venue: true,
-        _count: {
-          select: {
-            members: true,
-          },
-        },
-      },
-      orderBy: {
-        startTime: 'asc',
-      },
-      take: Number(limit),
-      skip: Number(offset),
-    });
-
-    res.json({
-      success: true,
-      data: meetups,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getNearbyMeetups = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { latitude, longitude, radius = 10, limit = 20 } = req.query;
-
-    const lat = Number(latitude);
-    const lon = Number(longitude);
-    const radiusKm = Number(radius);
-
-    if (!lat || !lon) {
-      throw new AppError('Latitude and longitude are required', 400);
-    }
-
-    const bbox = getBoundingBox(lat, lon, radiusKm);
-
-    const meetups = await prisma.meetup.findMany({
-      where: {
-        AND: [
-          {
-            latitude: {
-              gte: bbox.minLat,
-              lte: bbox.maxLat,
-            },
-          },
-          {
-            longitude: {
-              gte: bbox.minLon,
-              lte: bbox.maxLon,
-            },
-          },
-          {
-            status: {
-              in: ['UPCOMING', 'ONGOING'],
-            },
-          },
-        ],
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            displayName: true,
-            avatar: true,
-          },
-        },
-        venue: true,
-        _count: {
-          select: {
-            members: true,
-          },
-        },
-      },
-      take: Number(limit),
-    });
-
-    // Calculate distances and sort
-    const meetupsWithDistance = meetups
-      .map((meetup) => {
-        if (!meetup.latitude || !meetup.longitude) return null;
-        const distance = calculateDistance(
-          lat,
-          lon,
-          meetup.latitude,
-          meetup.longitude
-        );
-        return { ...meetup, distance };
-      })
-      .filter((m) => m !== null && m.distance <= radiusKm)
-      .sort((a, b) => a!.distance - b!.distance);
-
-    res.json({
-      success: true,
-      data: meetupsWithDistance,
     });
   } catch (error) {
     next(error);
@@ -483,6 +703,15 @@ export const joinMeetup = async (
 
     if (!meetup) {
       throw new AppError('Meetup not found', 404);
+    }
+
+    // Check if meetup is approved
+    if (meetup.status === 'PENDING_APPROVAL') {
+      throw new AppError('This activity is pending venue approval', 400);
+    }
+
+    if (meetup.status === 'REJECTED') {
+      throw new AppError('This activity was rejected by the venue', 400);
     }
 
     // Check if already a member
@@ -538,8 +767,9 @@ export const joinMeetup = async (
       },
     });
 
-    // Generate QR code ticket if meetup has physical location
-    const hasPhysicalLocation = meetup.latitude && meetup.longitude;
+    // Generate QR code ticket if meetup has physical location (venue or coordinates)
+    // Ticket is needed for onsite events/activities that require check-in
+    const hasPhysicalLocation = meetup.venueId || (meetup.latitude && meetup.longitude) || meetup.location;
     let ticket = null;
     
     if (hasPhysicalLocation) {
@@ -564,7 +794,7 @@ export const joinMeetup = async (
           qrCode: qrCodeData,
           userId: req.userId!,
           meetupId: meetup.id,
-          price: meetup.price || 0,
+          price: meetup.venueApprovedPrice || meetup.pricePerPerson || 0,
           expiresAt,
           status: 'ACTIVE',
         },
@@ -597,15 +827,21 @@ export const leaveMeetup = async (
   try {
     const { id } = req.params;
 
-    const member = await prisma.meetupMember.findFirst({
-      where: {
-        meetupId: id,
-        userId: req.userId!,
+    const meetup = await prisma.meetup.findUnique({
+      where: { id },
+      include: {
+        members: true,
       },
     });
 
+    if (!meetup) {
+      throw new AppError('Meetup not found', 404);
+    }
+
+    const member = meetup.members.find((m) => m.userId === req.userId);
+
     if (!member) {
-      throw new AppError('Not a member of this meetup', 404);
+      throw new AppError('You are not a member of this meetup', 404);
     }
 
     await prisma.meetupMember.delete({

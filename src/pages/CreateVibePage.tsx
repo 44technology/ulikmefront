@@ -269,8 +269,17 @@ const CreateVibePage = () => {
         // If it's not a UUID (mock data), don't send venueId - silently skip
       }
       
-      await createMeetup.mutateAsync(meetupData);
-      toast.success('Vibe created successfully!');
+      const response = await createMeetup.mutateAsync(meetupData);
+      
+      // Show appropriate message based on venue approval status
+      if (selectedVenueId && meetupData.venueId) {
+        toast.success('Activity created! Waiting for venue approval. You will be notified once approved.', {
+          duration: 5000,
+        });
+      } else {
+        toast.success('Vibe created successfully!');
+      }
+      
       navigate('/my-meetups');
     } catch (error: any) {
       console.error('Create vibe error:', error);
@@ -485,14 +494,37 @@ const CreateVibePage = () => {
 
                 {/* Selected venue */}
                 {venue && (
-                  <div className="p-4 rounded-xl bg-primary/10 border-2 border-primary">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-primary" />
-                      <div>
-                        <p className="font-medium text-foreground">{venue}</p>
-                        <p className="text-sm text-muted-foreground">{venueAddress}</p>
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-xl bg-primary/10 border-2 border-primary">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-primary" />
+                        <div>
+                          <p className="font-medium text-foreground">{venue}</p>
+                          <p className="text-sm text-muted-foreground">{venueAddress}</p>
+                        </div>
                       </div>
                     </div>
+                    {/* Venue approval notice */}
+                    {selectedVenueId && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 rounded-xl bg-blue-500/10 border-2 border-blue-500/20"
+                      >
+                        <div className="flex items-start gap-3">
+                          <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-blue-700 mb-1">
+                              Venue Approval Required
+                            </p>
+                            <p className="text-xs text-blue-600 leading-relaxed">
+                              This activity will be sent to <strong>{venue}</strong> for approval. 
+                              The venue may adjust the price before approving. You'll be notified once they respond.
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 )}
 

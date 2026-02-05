@@ -24,10 +24,12 @@ enum UserStatus {
 }
 
 enum MeetupStatus {
+  PENDING_APPROVAL
   UPCOMING
   ONGOING
   COMPLETED
   CANCELLED
+  REJECTED
 }
 
 enum MatchStatus {
@@ -141,8 +143,10 @@ model Meetup {
   location    String?       // Location name/address
   isPublic    Boolean       @default(true)  // Public or private event
   isFree      Boolean       @default(true)  // Free or paid event
-  pricePerPerson Float?     // Price per person if paid
-  isBlindMeet Boolean       @default(false) // Blind meet (users can't see each other)
+  pricePerPerson Float?     // Price per person if paid (user's requested price)
+  venueApprovedPrice Float? // Price approved by venue (can be different from user's price)
+  venueApprovalStatus String? // 'pending', 'approved', 'rejected'
+  venueRejectionReason String? // Reason if rejected
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

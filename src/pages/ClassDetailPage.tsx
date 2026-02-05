@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, MapPin, Clock, DollarSign, Users, Calendar, Phone, Globe, CreditCard, AlertCircle, Info, Star, CheckCircle2, X, Monitor, CheckCircle, Sparkles, MessageCircle, ChevronRight, FileText, ListChecks, PlayCircle, TrendingUp, ShoppingBag, Download, Gift, Package, Send, Plus, Ticket } from 'lucide-react';
+import { ArrowLeft, BookOpen, MapPin, Clock, DollarSign, Users, Calendar, Phone, Globe, CreditCard, AlertCircle, Info, Star, CheckCircle2, X, Monitor, CheckCircle, Sparkles, MessageCircle, ChevronRight, FileText, ListChecks, PlayCircle, TrendingUp, ShoppingBag, Download, Gift, Package, Send, Plus, Ticket, QrCode } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/ui/UserAvatar';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useClass, useEnrollInClass, useCancelEnrollment } from '@/hooks/useClasses';
-import { useCreateTicketForClass } from '@/hooks/useTickets';
+import { useCreateTicketForClass, useMyTickets } from '@/hooks/useTickets';
 import { useMentor } from '@/hooks/useMentors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -19,6 +21,7 @@ const ClassDetailPage = () => {
   const { id } = useParams();
   const { isAuthenticated, user } = useAuth();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const isMentorClass = id?.startsWith('mentor-');
   const mentorId = isMentorClass ? id.replace('mentor-', '') : null;
   const { data: mentor, isLoading: mentorLoading } = useMentor(mentorId || '');
@@ -28,6 +31,7 @@ const ClassDetailPage = () => {
   const enrollInClass = useEnrollInClass();
   const cancelEnrollment = useCancelEnrollment();
   const createTicket = useCreateTicketForClass();
+  const { data: myTickets } = useMyTickets();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
@@ -36,6 +40,11 @@ const ClassDetailPage = () => {
   const [questionText, setQuestionText] = useState('');
   const [selectedLessonForQA, setSelectedLessonForQA] = useState<string | null>(null);
   const [createdTicket, setCreatedTicket] = useState<any>(null);
+  const [justEnrolled, setJustEnrolled] = useState(false);
+  const [isFreeEnrollment, setIsFreeEnrollment] = useState(false);
+  
+  // Find ticket for this class if user has enrolled
+  const userTicket = myTickets?.find(t => t.class?.id === id && t.status !== 'CANCELLED');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -60,8 +69,17 @@ const ClassDetailPage = () => {
   
   const cardType = getCardType(cardNumber);
 
-  const isEnrolled = classItem?.enrollments?.some((e) => e.user.id === user?.id) || false;
-  const enrollment = classItem?.enrollments?.find((e) => e.user.id === user?.id);
+  // Check if user is enrolled - check both enrollments array and ticket
+  const isEnrolledFromEnrollments = user && classItem?.enrollments?.some((e) => 
+    (typeof e.user === 'object' ? e.user?.id : e.userId) === user.id
+  ) || false;
+  const hasTicket = !!userTicket && userTicket.status !== 'CANCELLED';
+  const hasCreatedTicket = !!createdTicket && createdTicket.qrCode;
+  const isEnrolled = isEnrolledFromEnrollments || hasTicket || justEnrolled || hasCreatedTicket;
+  
+  const enrollment = classItem?.enrollments?.find((e) => 
+    user && (typeof e.user === 'object' ? e.user?.id : e.userId) === user.id
+  );
   const isPaid = isEnrolled && enrollment && (enrollment.status === 'paid' || enrollment.status === 'enrolled') && classItem?.price && classItem.price > 0;
   
   // Check if enrollment is within 24 hours (for refund eligibility)
@@ -92,13 +110,27 @@ const ClassDetailPage = () => {
     // Free class - enroll directly
     try {
       const enrollment = await enrollInClass.mutateAsync(id!);
-      toast.success('Successfully enrolled in class!');
+      console.log('Free enrollment response:', enrollment);
+      
+      // Mark as just enrolled to update UI immediately
+      setJustEnrolled(true);
+      setIsFreeEnrollment(true);
+      
+      // Invalidate queries to refresh enrollment status
+      queryClient.invalidateQueries({ queryKey: ['class', id] });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
       
       // Show QR code ticket if available (from enrollment response)
-      if (enrollment?.ticket) {
-        setCreatedTicket(enrollment.ticket);
-        setShowTicketDialog(true);
+      // Check multiple possible response structures
+      const ticket = enrollment?.ticket || enrollment?.data?.ticket || (enrollment as any)?.ticket;
+      console.log('Ticket from enrollment:', ticket);
+      if (ticket && ticket.qrCode) {
+        setCreatedTicket(ticket);
+        console.log('Created ticket set:', ticket);
       }
+      
+      // Show success modal for free classes too
+      setShowSuccessDialog(true);
     } catch (error: any) {
       toast.error(error.message || 'Failed to enroll');
     }
@@ -112,6 +144,14 @@ const ClassDetailPage = () => {
 
     try {
       const enrollment = await enrollInClass.mutateAsync(id!);
+      
+      // Mark as just enrolled to update UI immediately
+      setJustEnrolled(true);
+      setIsFreeEnrollment(false); // Paid enrollment
+      
+      // Invalidate queries to refresh enrollment status
+      queryClient.invalidateQueries({ queryKey: ['class', id] });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
       
       // Generate invoice info
       const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -215,6 +255,7 @@ const ClassDetailPage = () => {
   const handleCancel = async () => {
     try {
       await cancelEnrollment.mutateAsync(id!);
+      setJustEnrolled(false); // Reset justEnrolled state
       toast.success('Enrollment cancelled');
     } catch (error: any) {
       toast.error(error.message || 'Failed to cancel enrollment');
@@ -723,6 +764,31 @@ const ClassDetailPage = () => {
             <div className="card-elevated p-4 rounded-2xl space-y-3">
               <h3 className="font-semibold text-foreground mb-3">Class Details</h3>
               
+              {/* QR Code Ticket - Show if user has enrolled and has ticket */}
+              {(isEnrolled && (userTicket || createdTicket) && (userTicket?.status !== 'USED' && createdTicket?.status !== 'USED')) && (
+                <motion.button
+                  onClick={() => {
+                    const ticketToShow = userTicket || createdTicket;
+                    if (ticketToShow) {
+                      setCreatedTicket(ticketToShow);
+                      setShowTicketDialog(true);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/20 text-left mb-3"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="p-2 rounded-lg bg-primary/20">
+                    <Ticket className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">Your Ticket</p>
+                    <p className="font-medium text-foreground">View QR Code</p>
+                    <p className="text-xs text-primary mt-1">Tap to show your entry QR code</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-primary" />
+                </motion.button>
+              )}
+              
               {classItem.startTime && (
                 <>
                   <div className="flex items-center gap-3">
@@ -1110,7 +1176,15 @@ const ClassDetailPage = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setShowSuccessDialog(false)}
+                onClick={() => {
+                  setShowSuccessDialog(false);
+                  setIsFreeEnrollment(false);
+                  // Invalidate class query to refresh enrollment status
+                  if (id) {
+                    queryClient.invalidateQueries({ queryKey: ['class', id] });
+                    queryClient.invalidateQueries({ queryKey: ['tickets'] });
+                  }
+                }}
                 className="fixed inset-0 bg-black/50 z-50"
               />
               
@@ -1127,7 +1201,15 @@ const ClassDetailPage = () => {
                   {/* Close button */}
                   <div className="flex justify-end p-4">
                     <motion.button
-                      onClick={() => setShowSuccessDialog(false)}
+                      onClick={() => {
+                        setShowSuccessDialog(false);
+                        setIsFreeEnrollment(false);
+                        // Invalidate class query to refresh enrollment status
+                        if (id) {
+                          queryClient.invalidateQueries({ queryKey: ['class', id] });
+                          queryClient.invalidateQueries({ queryKey: ['tickets'] });
+                        }
+                      }}
                       className="p-2 rounded-full hover:bg-muted transition-colors"
                       whileTap={{ scale: 0.9 }}
                     >
@@ -1157,11 +1239,8 @@ const ClassDetailPage = () => {
                       className="text-center mb-6"
                     >
                       <h2 className="text-2xl font-bold text-foreground mb-2">
-                        {t('paymentSuccessful')}
+                        {isFreeEnrollment ? t('enrollmentSuccessful') || 'Enrollment Successful!' : t('paymentSuccessful')}
                       </h2>
-                      <p className="text-base text-muted-foreground mb-3">
-                        {t('assistantInfo')}
-                      </p>
                     </motion.div>
 
                     {/* Class Schedule Info */}
@@ -1180,7 +1259,7 @@ const ClassDetailPage = () => {
                           <p className="text-xs text-muted-foreground">{t('classInfo')}</p>
                         </div>
                         <div className="px-3 py-1 rounded-full bg-green-500 text-white text-xs font-medium">
-                          {t('paymentCompleted')}
+                          {isFreeEnrollment ? 'Enrolled' : t('paymentCompleted')}
                         </div>
                       </div>
                       
@@ -1224,6 +1303,36 @@ const ClassDetailPage = () => {
                         )}
                       </div>
                     </motion.div>
+
+                    {/* QR Code Ticket Section */}
+                    {createdTicket && createdTicket.qrCode && (
+                      <motion.div
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.45 }}
+                        className="w-full mb-6"
+                      >
+                        <div className="text-center mb-4">
+                          <h4 className="text-sm font-semibold text-foreground mb-1">Your Entry QR Code</h4>
+                          <p className="text-xs text-muted-foreground">Show this QR code at the class entrance</p>
+                        </div>
+                        <div className="flex justify-center">
+                          <div className="bg-white rounded-2xl p-6 border-4 border-primary/20">
+                            <QRCodeDisplay 
+                              value={createdTicket.qrCode} 
+                              size={200}
+                              className="rounded-lg"
+                            />
+                          </div>
+                        </div>
+                        {createdTicket.ticketNumber && (
+                          <div className="text-center mt-4">
+                            <p className="text-xs text-muted-foreground mb-1">Ticket Number</p>
+                            <p className="text-sm font-mono font-semibold text-foreground">{createdTicket.ticketNumber}</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
 
                     {/* Payment Invoice Info */}
                     {paymentInvoice && (
@@ -1277,14 +1386,6 @@ const ClassDetailPage = () => {
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-muted">
                           <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="text-sm font-medium text-foreground">{t('waitForAssistant')}</p>
-                            <p className="text-xs text-muted-foreground">{t('waitForAssistantDesc')}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-muted">
-                          <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                          <div>
                             <p className="text-sm font-medium text-foreground">{t('joinChat')}</p>
                             <p className="text-xs text-muted-foreground">{t('joinChatDesc')}</p>
                           </div>
@@ -1308,7 +1409,7 @@ const ClassDetailPage = () => {
                       className="w-full pb-4"
                     >
                       <div className="space-y-2">
-                        {createdTicket && (
+                        {createdTicket && createdTicket.qrCode && (
                           <Button
                             onClick={() => {
                               setShowSuccessDialog(false);
@@ -1317,13 +1418,26 @@ const ClassDetailPage = () => {
                             variant="outline"
                             className="w-full h-12 rounded-xl flex items-center justify-center gap-2"
                           >
-                            <QrCode className="w-5 h-5" />
-                            View QR Code Ticket
+                            <Ticket className="w-5 h-5" />
+                            View Full Ticket Details
                           </Button>
+                        )}
+                        {!createdTicket?.qrCode && isFreeEnrollment && (
+                          <div className="w-full p-4 rounded-xl bg-muted border-2 border-dashed border-muted-foreground/20 text-center">
+                            <p className="text-sm text-muted-foreground">
+                              This is an online class. No QR code needed.
+                            </p>
+                          </div>
                         )}
                         <Button
                           onClick={() => {
                             setShowSuccessDialog(false);
+                            setIsFreeEnrollment(false);
+                            // Invalidate class query to refresh enrollment status
+                            if (id) {
+                              queryClient.invalidateQueries({ queryKey: ['class', id] });
+                              queryClient.invalidateQueries({ queryKey: ['tickets'] });
+                            }
                             // Go back to previous page (where user came from)
                             navigate(-1);
                           }}
@@ -1353,69 +1467,130 @@ const ClassDetailPage = () => {
               </DialogDescription>
             </DialogHeader>
             
-            {createdTicket && (
-              <div className="space-y-6 py-4">
-                {/* Ticket Number */}
-                <div className="text-center pb-4 border-b border-border">
-                  <p className="text-sm text-muted-foreground mb-1">Ticket Number</p>
-                  <p className="text-xl font-bold text-foreground">{createdTicket.ticketNumber}</p>
-                </div>
+            {(() => {
+              const ticketToShow = createdTicket || userTicket;
+              if (!ticketToShow) {
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No ticket found</p>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="space-y-6 py-4">
+                  {/* Ticket Number */}
+                  {ticketToShow.ticketNumber && (
+                    <div className="text-center pb-4 border-b border-border">
+                      <p className="text-sm text-muted-foreground mb-1">Ticket Number</p>
+                      <p className="text-xl font-bold text-foreground">{ticketToShow.ticketNumber}</p>
+                    </div>
+                  )}
 
-                {/* QR Code */}
-                <div className="flex justify-center">
-                  <div className="w-64 h-64 bg-white rounded-2xl p-4 border-4 border-primary/20 flex items-center justify-center">
-                    <div className="text-center space-y-2">
-                      <QrCode className="w-48 h-48 mx-auto text-foreground" />
-                      <p className="text-xs font-mono text-muted-foreground break-all">{createdTicket.qrCode}</p>
+                  {/* QR Code */}
+                  <div className="flex justify-center">
+                    <div className="bg-white rounded-2xl p-6 border-4 border-primary/20 flex items-center justify-center">
+                      {ticketToShow.qrCode ? (
+                        <QRCodeDisplay 
+                          value={ticketToShow.qrCode} 
+                          size={240}
+                          className="rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-64 h-64 flex items-center justify-center">
+                          <p className="text-sm text-muted-foreground">QR code generating...</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                {/* Event Info */}
-                {createdTicket.class && (
-                  <div className="p-4 rounded-xl bg-muted space-y-2">
-                    <p className="text-sm font-semibold text-foreground">{createdTicket.class.title}</p>
-                    {createdTicket.class.startTime && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span className="text-muted-foreground">
-                          {format(new Date(createdTicket.class.startTime), 'EEEE, MMMM d, yyyy • h:mm a')}
-                        </span>
+                  
+                  {/* Ticket Status */}
+                  {ticketToShow.status && (
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Status</p>
+                      <p className={`text-sm font-semibold ${
+                        ticketToShow.status === 'ACTIVE' ? 'text-green-600' : 
+                        ticketToShow.status === 'USED' ? 'text-muted-foreground' : 
+                        'text-orange-600'
+                      }`}>
+                        {ticketToShow.status === 'ACTIVE' ? 'Active' : 
+                         ticketToShow.status === 'USED' ? 'Used' : 
+                         ticketToShow.status}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* QR Code Data (for debugging, can be removed in production) */}
+                  {ticketToShow.qrCode && process.env.NODE_ENV === 'development' && (
+                    <div className="text-center">
+                      <p className="text-xs font-mono text-muted-foreground break-all px-4">
+                        {ticketToShow.qrCode}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Event Info */}
+                  {(() => {
+                    const eventClass = ticketToShow?.class || classItem;
+                    if (!eventClass) return null;
+                    
+                    return (
+                      <div className="p-4 rounded-xl bg-muted space-y-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          {eventClass.title}
+                        </p>
+                        {eventClass.startTime && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            <span className="text-muted-foreground">
+                              {format(
+                                new Date(eventClass.startTime),
+                                'EEEE, MMMM d, yyyy • h:mm a'
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        {eventClass.venue && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <MapPin className="w-4 h-4 text-primary" />
+                            <span className="text-muted-foreground">
+                              {eventClass.venue.name}
+                              {eventClass.venue.address && ` • ${eventClass.venue.address}`}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {createdTicket.class.venue && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="w-4 h-4 text-primary" />
-                        <span className="text-muted-foreground">{createdTicket.class.venue.name}</span>
-                      </div>
-                    )}
+                    );
+                  })()}
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowTicketDialog(false);
+                        const ticketToShow = createdTicket || userTicket;
+                        if (ticketToShow?.id) {
+                          navigate(`/ticket/${ticketToShow.id}`);
+                        }
+                      }}
+                      className="flex-1"
+                    >
+                      View Full Ticket
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowTicketDialog(false);
+                        navigate(-1);
+                      }}
+                      className="flex-1 bg-gradient-primary"
+                    >
+                      Done
+                    </Button>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowTicketDialog(false);
-                      navigate(`/ticket/${createdTicket.id}`);
-                    }}
-                    className="flex-1"
-                  >
-                    View Full Ticket
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowTicketDialog(false);
-                      navigate(-1);
-                    }}
-                    className="flex-1 bg-gradient-primary"
-                  >
-                    Done
-                  </Button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
 

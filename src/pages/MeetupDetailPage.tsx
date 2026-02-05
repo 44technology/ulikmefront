@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Users, Calendar, Heart, Share2, User, DollarSign, Lock, Globe, Tag, Sparkles, MessageCircle, Edit, Trash2, Save, X, Ticket, QrCode } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Users, Calendar, Heart, Share2, User, DollarSign, Lock, Globe, Tag, Sparkles, MessageCircle, Edit, Trash2, Save, X, Ticket, ChevronRight } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import UserAvatar from '@/components/ui/UserAvatar';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useMeetup, useJoinMeetup, useUpdateMeetup, useDeleteMeetup } from '@/hooks/useMeetups';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePersonalization } from '@/hooks/usePersonalization';
-import { useCreateTicketForMeetup } from '@/hooks/useTickets';
+import { useCreateTicketForMeetup, useMyTickets } from '@/hooks/useTickets';
 import {
   Dialog,
   DialogContent,
@@ -65,8 +66,15 @@ const MeetupDetailPage = () => {
   const deleteMeetup = useDeleteMeetup();
   const createTicket = useCreateTicketForMeetup();
   const { trackJoin } = usePersonalization();
+  const { data: myTickets } = useMyTickets();
   const [showTicketDialog, setShowTicketDialog] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<any>(null);
+  
+  // Find ticket for this meetup if user has joined
+  const userTicket = myTickets?.find(t => t.meetup?.id === id && t.status !== 'CANCELLED');
+  const isJoined = user && meetup?.members?.some(m => 
+    (typeof m.user === 'object' ? m.user?.id : m.userId) === user.id
+  ) || false;
   
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -202,24 +210,44 @@ const MeetupDetailPage = () => {
     try {
       const result = await joinMeetup.mutateAsync({ meetupId: id, status: 'going' });
       
+      // Mark as just joined to update UI immediately
+      setJustJoined(true);
+      
       // Track for personalization
       if (user) {
         trackJoin(meetup);
       }
       
+      // Debug: Log the result to see its structure
+      console.log('Join result:', result);
+      
       // Show QR code ticket if available (from join response)
-      if (result?.ticket) {
-        setCreatedTicket(result.ticket);
+      // Check both result.ticket and result.data?.ticket for compatibility
+      const ticket = result?.ticket || result?.data?.ticket;
+      
+      if (ticket) {
+        setCreatedTicket(ticket);
         setShowTicketDialog(true);
+        toast.success('Successfully joined! Your QR code ticket is ready.');
       } else {
-        // Fallback: Try to create ticket separately if not in join response
-        try {
-          const ticket = await createTicket.mutateAsync(id);
-          setCreatedTicket(ticket);
-          setShowTicketDialog(true);
-        } catch (ticketError: any) {
-          // Ticket creation failed, but join succeeded
-          console.warn('Ticket creation failed:', ticketError);
+        // Check if meetup has physical location - if yes, try to create ticket
+        const hasPhysicalLocation = meetup.venueId || (meetup.latitude && meetup.longitude) || meetup.location;
+        
+        if (hasPhysicalLocation) {
+          // Fallback: Try to create ticket separately if not in join response
+          try {
+            const createdTicket = await createTicket.mutateAsync(id);
+            setCreatedTicket(createdTicket);
+            setShowTicketDialog(true);
+            toast.success('Successfully joined! Your QR code ticket is ready.');
+          } catch (ticketError: any) {
+            // Ticket creation failed, but join succeeded
+            console.warn('Ticket creation failed:', ticketError);
+            toast.success('Joined the vibe!');
+            navigate('/home');
+          }
+        } else {
+          // No physical location, no ticket needed
           toast.success('Joined the vibe!');
           navigate('/home');
         }
@@ -799,23 +827,48 @@ const MeetupDetailPage = () => {
               </div>
 
               {/* Event Info */}
-              {createdTicket.meetup && (
+              {(createdTicket.meetup || meetup) && (
                 <div className="p-4 rounded-xl bg-muted space-y-2">
-                  <p className="text-sm font-semibold text-foreground">{createdTicket.meetup.title}</p>
-                  {createdTicket.meetup.startTime && (
+                  <p className="text-sm font-semibold text-foreground">
+                    {createdTicket.meetup?.title || meetup?.title}
+                  </p>
+                  {(createdTicket.meetup?.startTime || meetup?.startTime) && (
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar className="w-4 h-4 text-primary" />
                       <span className="text-muted-foreground">
-                        {format(new Date(createdTicket.meetup.startTime), 'EEEE, MMMM d, yyyy • h:mm a')}
+                        {format(
+                          new Date(createdTicket.meetup?.startTime || meetup?.startTime || ''),
+                          'EEEE, MMMM d, yyyy • h:mm a'
+                        )}
                       </span>
                     </div>
                   )}
-                  {createdTicket.meetup.venue && (
+                  {(createdTicket.meetup?.venue || meetup?.venue) && (
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground">{createdTicket.meetup.venue.name}</span>
+                      <span className="text-muted-foreground">
+                        {(createdTicket.meetup?.venue || meetup?.venue)?.name}
+                      </span>
                     </div>
                   )}
+                </div>
+              )}
+              
+              {/* Ticket Status */}
+              {createdTicket.status && (
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                    createdTicket.status === 'ACTIVE' 
+                      ? 'bg-green-500/10 text-green-600 border border-green-500/20'
+                      : createdTicket.status === 'USED'
+                      ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                      : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                  }`}>
+                    {createdTicket.status === 'ACTIVE' ? 'Active' : 
+                     createdTicket.status === 'USED' ? 'Used' : 
+                     createdTicket.status}
+                  </span>
                 </div>
               )}
 

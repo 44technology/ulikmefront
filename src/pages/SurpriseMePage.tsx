@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Dice5, Users, MapPin, Calendar, Sparkles, Clock, GraduationCap, Monitor, Building2 } from 'lucide-react';
+import { X, Dice5, Users, MapPin, Calendar, Sparkles, Clock, GraduationCap, Monitor, Building2, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import BottomNav from '@/components/layout/BottomNav';
 import { Button } from '@/components/ui/button';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useMeetups } from '@/hooks/useMeetups';
 import { useJoinMeetup } from '@/hooks/useMeetups';
 import { useClasses, useEnrollInClass } from '@/hooks/useClasses';
@@ -588,13 +590,29 @@ const SurpriseMePage = () => {
 
               {/* QR Code */}
               <div className="flex justify-center">
-                <div className="w-64 h-64 bg-white rounded-2xl p-4 border-4 border-primary/20 flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <QrCode className="w-48 h-48 mx-auto text-foreground" />
-                    <p className="text-xs font-mono text-muted-foreground break-all">{createdTicket.qrCode}</p>
-                  </div>
+                <div className="bg-white rounded-2xl p-6 border-4 border-primary/20 flex items-center justify-center">
+                  {createdTicket.qrCode ? (
+                    <QRCodeDisplay 
+                      value={createdTicket.qrCode} 
+                      size={240}
+                      className="rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-64 h-64 flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">QR code generating...</p>
+                    </div>
+                  )}
                 </div>
               </div>
+              
+              {/* QR Code Data (for debugging, can be removed in production) */}
+              {createdTicket.qrCode && (
+                <div className="text-center">
+                  <p className="text-xs font-mono text-muted-foreground break-all px-4">
+                    {createdTicket.qrCode}
+                  </p>
+                </div>
+              )}
 
               {/* Instructions */}
               <div className="text-center space-y-2">

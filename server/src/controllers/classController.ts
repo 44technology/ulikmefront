@@ -384,7 +384,9 @@ export const enrollInClass = async (
     });
 
     // Generate QR code ticket if class has physical location (onsite or hybrid)
-    const hasPhysicalLocation = classItem.latitude && classItem.longitude;
+    // Check if class has venue (venueId is required in schema, so this is always true)
+    // OR has latitude/longitude coordinates
+    const hasPhysicalLocation = classItem.venueId || (classItem.latitude && classItem.longitude);
     let ticket = null;
     
     if (hasPhysicalLocation) {

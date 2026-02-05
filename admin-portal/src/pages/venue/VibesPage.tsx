@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -7,7 +7,8 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
-import { Plus, Calendar, MapPin, Users, Ticket } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Plus, Calendar, MapPin, Users, Ticket, CheckCircle2, XCircle, Clock, DollarSign, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 type VibeTicket = {
@@ -87,8 +88,8 @@ export default function VibesPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Vibes</h1>
-          <p className="text-muted-foreground mt-2">Organize casual meetups and social events</p>
+          <h1 className="text-3xl font-bold text-foreground">Vibes & Activities</h1>
+          <p className="text-muted-foreground mt-2">Manage your vibes and approve user-created activities</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -219,7 +220,93 @@ export default function VibesPage() {
             </CardContent>
           </Card>
         ))}
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Approval Dialog */}
+      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {approvalAction === 'approve' ? 'Approve Activity' : 'Reject Activity'}
+            </DialogTitle>
+            <DialogDescription>
+              {approvalAction === 'approve' 
+                ? 'Review the activity and set the final price'
+                : 'Provide a reason for rejection'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedActivity && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-muted">
+                <h3 className="font-semibold mb-2">{selectedActivity.title}</h3>
+                <p className="text-sm text-muted-foreground mb-3">{selectedActivity.description}</p>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Requested Price:</span>
+                    <span className="font-medium">${selectedActivity.pricePerPerson || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Max Attendees:</span>
+                    <span className="font-medium">{selectedActivity.maxAttendees}</span>
+                  </div>
+                </div>
+              </div>
+
+              {approvalAction === 'approve' ? (
+                <div className="space-y-2">
+                  <Label>Final Price per Person</Label>
+                  <Input
+                    type="number"
+                    placeholder="Enter price"
+                    value={approvedPrice}
+                    onChange={(e) => setApprovedPrice(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    You can change the price from the user's requested ${selectedActivity.pricePerPerson || 0}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Rejection Reason</Label>
+                  <Textarea
+                    placeholder="Explain why this activity is being rejected..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowApprovalDialog(false);
+                    setSelectedActivity(null);
+                    setApprovedPrice('');
+                    setRejectionReason('');
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleApprove}
+                  disabled={loading || (approvalAction === 'approve' && !approvedPrice) || (approvalAction === 'reject' && !rejectionReason.trim())}
+                  className={`flex-1 ${approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive'}`}
+                >
+                  {loading ? 'Processing...' : approvalAction === 'approve' ? 'Approve' : 'Reject'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
