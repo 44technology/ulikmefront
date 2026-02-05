@@ -789,11 +789,11 @@ const OnboardingPage = () => {
               })}
             </div>
             <Button 
-              onClick={() => setStep('photos')} 
+              onClick={() => setStep('interests')} 
               disabled={lookingFor.length === 0 || loading}
               className="w-full bg-gradient-primary h-14 text-lg font-semibold shadow-glow disabled:opacity-50"
             >
-              Continue to Photos <ChevronRight className="ml-2" />
+              Continue <ChevronRight className="ml-2" />
             </Button>
             {lookingFor.length === 0 && (
               <p className="text-xs text-center text-muted-foreground">
