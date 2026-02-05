@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 const categoryOptions = [
   { id: 'coffee', icon: Coffee, label: 'Coffee', emoji: '☕', venueTypes: ['café', 'coffee', 'cafe'] },
   { id: 'dining', icon: UtensilsCrossed, label: 'Dining', emoji: '🍽️', venueTypes: ['restaurant', 'dining', 'food'] },
-  { id: 'sports', icon: Dumbbell, label: 'Sports', emoji: '🎾', venueTypes: ['sports', 'gym', 'park', 'stadium'] },
+  { id: 'sports', icon: Dumbbell, label: 'Sports', emoji: '🎾', venueTypes: ['sports', 'gym', 'stadium'] },
   { id: 'cinema', icon: Film, label: 'Cinema', emoji: '🎬', venueTypes: ['cinema', 'theater', 'entertainment'] },
   { id: 'wellness', icon: Heart, label: 'Wellness', emoji: '🧘', venueTypes: ['wellness', 'spa', 'yoga', 'fitness'] },
   { id: 'activities', icon: Palette, label: 'Activities', emoji: '🎨', venueTypes: ['activities', 'art', 'museum', 'gallery'] },
@@ -56,8 +56,6 @@ const groupSizeOptions = [
 // Mock venues for fallback with venue types
 const suggestedVenues = [
   { id: '1', name: 'Panther Coffee, Wynwood', address: '2390 NW 2nd Ave, Miami', city: 'Miami', rating: 4.8, phone: '(305) 555-0123', website: 'https://panthercoffee.com', image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400', priceRange: '$$', reviewCount: 342, category: 'Café', venueType: 'café' },
-  { id: '2', name: 'Bayfront Park, Downtown', address: '301 Biscayne Blvd, Miami', city: 'Miami', rating: 4.5, phone: '(305) 555-0124', website: '', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400', priceRange: '', reviewCount: 128, category: 'Park', venueType: 'park' },
-  { id: '3', name: 'Flamingo Park, South Beach', address: '1200 Jefferson Ave, Miami Beach', city: 'Miami Beach', rating: 4.7, phone: '(305) 555-0125', website: '', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400', priceRange: '', reviewCount: 89, category: 'Park', venueType: 'park' },
   { id: '4', name: 'Zuma Miami', address: '270 Biscayne Blvd Way, Miami', city: 'Miami', rating: 4.9, phone: '(305) 555-0126', website: 'https://zumarestaurant.com', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', priceRange: '$$$', reviewCount: 512, category: 'Japanese', venueType: 'restaurant' },
   { id: '5', name: 'Joe\'s Stone Crab', address: '11 Washington Ave, Miami Beach', city: 'Miami Beach', rating: 4.6, phone: '(305) 555-0127', website: 'https://joesstonecrab.com', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', priceRange: '$$$', reviewCount: 892, category: 'Restaurant', venueType: 'restaurant' },
   { id: '6', name: 'Versailles Restaurant', address: '3555 SW 8th St, Miami', city: 'Miami', rating: 4.4, phone: '(305) 555-0128', website: '', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', priceRange: '$$', reviewCount: 1245, category: 'Restaurant', venueType: 'restaurant' },

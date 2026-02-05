@@ -406,7 +406,6 @@ const DiscoverPage = () => {
                       <option value="japanese">Japanese</option>
                       <option value="italian">Italian</option>
                       <option value="sports">Sports</option>
-                      <option value="park">Park</option>
                     </>
                   ) : (
                     <>

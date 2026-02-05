@@ -235,18 +235,6 @@ export const venues = [
     isOpen: true,
     hasDeals: false,
   },
-  {
-    id: '14',
-    name: 'Bayfront Park',
-    category: 'Park',
-    image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
-    rating: 4.5,
-    reviewCount: 892,
-    distance: '1.8 mi',
-    priceRange: 'Free',
-    isOpen: true,
-    hasDeals: false,
-  },
 ];
 
 export const userProfile = {
