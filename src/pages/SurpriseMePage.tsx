@@ -45,6 +45,8 @@ const SurpriseMePage = () => {
   const [showAd, setShowAd] = useState(false);
   const [adTimeLeft, setAdTimeLeft] = useState(10);
   const [canRollToday, setCanRollToday] = useState(true);
+  const [showTicketDialog, setShowTicketDialog] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState<any | null>(null);
 
   // Check if user can roll dice today (once per day)
   useEffect(() => {
@@ -189,14 +191,16 @@ const SurpriseMePage = () => {
 
     try {
       if (itemType === 'vibe') {
-        await joinMeetup.mutateAsync({ meetupId: selectedItem.id });
+        const result = await joinMeetup.mutateAsync({ meetupId: selectedItem.id });
+        // QR code ticket is included in join response if meetup has physical location
         toast.success('Successfully joined the surprise vibe!');
         // Use setTimeout to ensure state updates complete before navigation
         setTimeout(() => {
           navigate(`/meetup/${selectedItem.id}`);
         }, 100);
       } else {
-        await enrollInClass.mutateAsync(selectedItem.id);
+        const enrollment = await enrollInClass.mutateAsync(selectedItem.id);
+        // QR code ticket is included in enrollment response if class has physical location
         toast.success('Successfully enrolled in the surprise class!');
         // Use setTimeout to ensure state updates complete before navigation
         setTimeout(() => {
@@ -560,6 +564,73 @@ const SurpriseMePage = () => {
           </div>
         </div>
       </div>
+
+      {/* Ticket QR Code Dialog */}
+      <Dialog open={showTicketDialog} onOpenChange={setShowTicketDialog}>
+        <DialogContent className="max-w-md mx-4 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ticket className="w-5 h-5 text-primary" />
+              Your Ticket
+            </DialogTitle>
+            <DialogDescription>
+              Show this QR code at the event entrance
+            </DialogDescription>
+          </DialogHeader>
+          
+          {createdTicket && (
+            <div className="space-y-6 py-4">
+              {/* Ticket Number */}
+              <div className="text-center pb-4 border-b border-border">
+                <p className="text-sm text-muted-foreground mb-1">Ticket Number</p>
+                <p className="text-xl font-bold text-foreground">{createdTicket.ticketNumber}</p>
+              </div>
+
+              {/* QR Code */}
+              <div className="flex justify-center">
+                <div className="w-64 h-64 bg-white rounded-2xl p-4 border-4 border-primary/20 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <QrCode className="w-48 h-48 mx-auto text-foreground" />
+                    <p className="text-xs font-mono text-muted-foreground break-all">{createdTicket.qrCode}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium text-foreground">Show this QR code at the entrance</p>
+                <p className="text-xs text-muted-foreground">
+                  Present your QR code to the venue staff for check-in
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTicketDialog(false);
+                setTimeout(() => {
+                  navigate(itemType === 'vibe' ? `/meetup/${selectedItem?.id}` : `/class/${selectedItem?.id}`);
+                }, 100);
+              }}
+              className="flex-1"
+            >
+              View Details
+            </Button>
+            <Button
+              onClick={() => {
+                setShowTicketDialog(false);
+                navigate('/home');
+              }}
+              className="flex-1 bg-gradient-primary"
+            >
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <BottomNav />
     </MobileLayout>

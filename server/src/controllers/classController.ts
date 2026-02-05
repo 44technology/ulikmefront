@@ -383,9 +383,52 @@ export const enrollInClass = async (
       },
     });
 
+    // Generate QR code ticket if class has physical location (onsite or hybrid)
+    const hasPhysicalLocation = classItem.latitude && classItem.longitude;
+    let ticket = null;
+    
+    if (hasPhysicalLocation) {
+      const { generateQRCodeData, generateTicketNumber } = await import('../utils/qrCodeGenerator.js');
+      
+      const qrCodeData = generateQRCodeData(
+        enrollment.id,
+        null,
+        classItem.id,
+        null,
+        req.userId!
+      );
+
+      // Calculate expiration date (class end date + 24 hours, or 30 days default)
+      const expiresAt = classItem.endTime
+        ? new Date(new Date(classItem.endTime).getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      ticket = await prisma.ticket.create({
+        data: {
+          ticketNumber: generateTicketNumber(),
+          qrCode: qrCodeData,
+          userId: req.userId!,
+          classId: classItem.id,
+          enrollmentId: enrollment.id,
+          price: classItem.price || 0,
+          expiresAt,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
     res.status(201).json({
       success: true,
-      data: enrollment,
+      data: {
+        ...enrollment,
+        ticket: ticket ? {
+          id: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          qrCode: ticket.qrCode,
+          qrCodeImage: ticket.qrCodeImage,
+          status: ticket.status,
+        } : null,
+      },
     });
   } catch (error) {
     next(error);

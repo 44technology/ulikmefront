@@ -105,7 +105,7 @@ const ClassDetailPage = () => {
     }
 
     try {
-      await enrollInClass.mutateAsync(id!);
+      const enrollment = await enrollInClass.mutateAsync(id!);
       
       // Generate invoice info
       const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -124,10 +124,9 @@ const ClassDetailPage = () => {
       setCardExpiry('');
       setCardCVC('');
       
-      // Create ticket with QR code
-      try {
-        const ticket = await createTicket.mutateAsync(id!);
-        setCreatedTicket(ticket);
+      // Show QR code ticket if available (from enrollment response)
+      if (enrollment?.ticket) {
+        setCreatedTicket(enrollment.ticket);
         
         // Only show success modal for card payments, not cash
         if (paymentMethod === 'card') {
@@ -150,26 +149,54 @@ const ClassDetailPage = () => {
             });
           }
         }
-      } catch (ticketError: any) {
-        // Ticket creation failed, but enrollment succeeded
-        console.warn('Ticket creation failed:', ticketError);
-        // Only show success modal for card payments, not cash
-        if (paymentMethod === 'card') {
-          setShowSuccessDialog(true);
-        } else {
-          // For cash payment, show info message with class start date
-          const startDate = classItem?.startTime ? new Date(classItem.startTime) : null;
-          if (startDate) {
-            const formattedDate = format(startDate, 'EEEE, MMMM d');
-            toast.success('Enrollment confirmed!', {
-              description: `You can pay in cash before the first lesson on ${formattedDate}.`,
-              duration: 5000,
-            });
+      } else {
+        // Fallback: Try to create ticket separately if not in enrollment response
+        try {
+          const ticket = await createTicket.mutateAsync(id!);
+          setCreatedTicket(ticket);
+          
+          // Only show success modal for card payments, not cash
+          if (paymentMethod === 'card') {
+            setShowSuccessDialog(true);
           } else {
-            toast.success('Enrollment confirmed!', {
-              description: 'You can pay in cash before the first lesson starts.',
-              duration: 5000,
-            });
+            // For cash payment, show ticket dialog with info message
+            setShowTicketDialog(true);
+            // Also show info message with class start date
+            const startDate = classItem?.startTime ? new Date(classItem.startTime) : null;
+            if (startDate) {
+              const formattedDate = format(startDate, 'EEEE, MMMM d');
+              toast.success('Enrollment confirmed!', {
+                description: `You can pay in cash before the first lesson on ${formattedDate}.`,
+                duration: 5000,
+              });
+            } else {
+              toast.success('Enrollment confirmed!', {
+                description: 'You can pay in cash before the first lesson starts.',
+                duration: 5000,
+              });
+            }
+          }
+        } catch (ticketError: any) {
+          // Ticket creation failed, but enrollment succeeded
+          console.warn('Ticket creation failed:', ticketError);
+          // Only show success modal for card payments, not cash
+          if (paymentMethod === 'card') {
+            setShowSuccessDialog(true);
+          } else {
+            // For cash payment, show info message with class start date
+            const startDate = classItem?.startTime ? new Date(classItem.startTime) : null;
+            if (startDate) {
+              const formattedDate = format(startDate, 'EEEE, MMMM d');
+              toast.success('Enrollment confirmed!', {
+                description: `You can pay in cash before the first lesson on ${formattedDate}.`,
+                duration: 5000,
+              });
+            } else {
+              toast.success('Enrollment confirmed!', {
+                description: 'You can pay in cash before the first lesson starts.',
+                duration: 5000,
+              });
+            }
           }
         }
       }

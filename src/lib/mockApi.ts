@@ -1464,9 +1464,12 @@ export const mockApiRequest = async <T = any>(
     const meetup = meetups.find((m: any) => m.id === meetupId);
     if (meetup) {
       const user = getStorage(`${USER_STORAGE_KEY}_current-user`, getDummyUser('current-user'));
-      if (!meetup.members.find((m: any) => m.user.id === 'current-user')) {
-        meetup.members.push({
-          id: generateId(),
+      let member = meetup.members.find((m: any) => m.user.id === 'current-user');
+      
+      if (!member) {
+        const memberId = generateId();
+        member = {
+          id: memberId,
           user: {
             id: user.id,
             firstName: user.firstName,
@@ -1475,10 +1478,51 @@ export const mockApiRequest = async <T = any>(
             avatar: user.avatar,
           },
           status: body.status || 'going',
-        });
+        };
+        meetup.members.push(member);
         meetup._count.members = meetup.members.length;
         setStorage(MEETUP_STORAGE_KEY, meetups);
       }
+      
+      // Generate QR code ticket if meetup has physical location
+      let ticket = null;
+      const hasPhysicalLocation = meetup.latitude && meetup.longitude;
+      
+      if (hasPhysicalLocation) {
+        const ticketNumber = `TKT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+        const qrCodeData = JSON.stringify({
+          enrollmentId: null,
+          meetupMemberId: member.id,
+          classId: null,
+          meetupId: meetup.id,
+          userId: currentUserId,
+          timestamp: Date.now(),
+          hash: 'mock-hash-' + Date.now(),
+        });
+        
+        const expiresAt = meetup.endTime
+          ? new Date(new Date(meetup.endTime).getTime() + 24 * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        ticket = {
+          id: generateId(),
+          ticketNumber,
+          qrCode: qrCodeData,
+          qrCodeImage: null,
+          status: 'ACTIVE',
+          price: meetup.price || 0,
+          purchasedAt: new Date().toISOString(),
+          expiresAt,
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          ...member,
+          ticket,
+        },
+      } as T;
     }
     return {
       success: true,
@@ -1886,9 +1930,61 @@ export const mockApiRequest = async <T = any>(
 
     if (pathname.includes('/enroll')) {
       if (!currentUserId) throw new Error('Unauthorized');
+      const classId = pathname.split('/')[pathname.split('/').length - 2];
+      const cls = classes.find((c: any) => c.id === classId);
+      if (!cls) throw new Error('Class not found');
+      
+      // Create enrollment
+      const enrollmentId = generateId();
+      const enrollment = {
+        id: enrollmentId,
+        classId: cls.id,
+        userId: currentUserId,
+        status: 'enrolled',
+        enrolledAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        user: getStorage(`${USER_STORAGE_KEY}_current-user`, getDummyUser('current-user')),
+        class: cls,
+      };
+      
+      // Generate QR code ticket if class has physical location
+      let ticket = null;
+      const hasPhysicalLocation = cls.latitude && cls.longitude;
+      
+      if (hasPhysicalLocation) {
+        const ticketNumber = `TKT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+        const qrCodeData = JSON.stringify({
+          enrollmentId,
+          meetupMemberId: null,
+          classId: cls.id,
+          meetupId: null,
+          userId: currentUserId,
+          timestamp: Date.now(),
+          hash: 'mock-hash-' + Date.now(),
+        });
+        
+        const expiresAt = cls.endTime
+          ? new Date(new Date(cls.endTime).getTime() + 24 * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        ticket = {
+          id: generateId(),
+          ticketNumber,
+          qrCode: qrCodeData,
+          qrCodeImage: null,
+          status: 'ACTIVE',
+          price: cls.price || 0,
+          purchasedAt: new Date().toISOString(),
+          expiresAt,
+        };
+      }
+      
       return {
         success: true,
-        message: 'Enrolled successfully',
+        data: {
+          ...enrollment,
+          ticket,
+        },
       } as T;
     }
   }

@@ -538,9 +538,51 @@ export const joinMeetup = async (
       },
     });
 
+    // Generate QR code ticket if meetup has physical location
+    const hasPhysicalLocation = meetup.latitude && meetup.longitude;
+    let ticket = null;
+    
+    if (hasPhysicalLocation) {
+      const { generateQRCodeData, generateTicketNumber } = await import('../utils/qrCodeGenerator.js');
+      
+      const qrCodeData = generateQRCodeData(
+        null,
+        member.id,
+        null,
+        meetup.id,
+        req.userId!
+      );
+
+      // Calculate expiration date (meetup end date + 24 hours, or 30 days default)
+      const expiresAt = meetup.endTime
+        ? new Date(new Date(meetup.endTime).getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      ticket = await prisma.ticket.create({
+        data: {
+          ticketNumber: generateTicketNumber(),
+          qrCode: qrCodeData,
+          userId: req.userId!,
+          meetupId: meetup.id,
+          price: meetup.price || 0,
+          expiresAt,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
     res.status(201).json({
       success: true,
-      data: member,
+      data: {
+        ...member,
+        ticket: ticket ? {
+          id: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          qrCode: ticket.qrCode,
+          qrCodeImage: ticket.qrCodeImage,
+          status: ticket.status,
+        } : null,
+      },
     });
   } catch (error) {
     next(error);

@@ -200,23 +200,29 @@ const MeetupDetailPage = () => {
     }
 
     try {
-      await joinMeetup.mutateAsync({ meetupId: id, status: 'going' });
+      const result = await joinMeetup.mutateAsync({ meetupId: id, status: 'going' });
       
       // Track for personalization
       if (user) {
         trackJoin(meetup);
       }
       
-      // Create ticket with QR code
-      try {
-        const ticket = await createTicket.mutateAsync(id);
-        setCreatedTicket(ticket);
+      // Show QR code ticket if available (from join response)
+      if (result?.ticket) {
+        setCreatedTicket(result.ticket);
         setShowTicketDialog(true);
-      } catch (ticketError: any) {
-        // Ticket creation failed, but join succeeded
-        console.warn('Ticket creation failed:', ticketError);
-        toast.success('Joined the vibe!');
-        navigate('/home');
+      } else {
+        // Fallback: Try to create ticket separately if not in join response
+        try {
+          const ticket = await createTicket.mutateAsync(id);
+          setCreatedTicket(ticket);
+          setShowTicketDialog(true);
+        } catch (ticketError: any) {
+          // Ticket creation failed, but join succeeded
+          console.warn('Ticket creation failed:', ticketError);
+          toast.success('Joined the vibe!');
+          navigate('/home');
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to join vibe');
