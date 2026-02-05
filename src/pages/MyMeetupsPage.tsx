@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, MapPin, Users, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Clock, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import BottomNav from '@/components/layout/BottomNav';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { useMeetups } from '@/hooks/useMeetups';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,8 +60,38 @@ const pastMeetups = [
   },
 ];
 
-const MeetupItem = ({ meetup }: { meetup: typeof upcomingMeetups[0] }) => {
+const MeetupItem = ({ meetup, showApprovalStatus }: { meetup: typeof upcomingMeetups[0] & { approvalStatus?: string; venueApprovedPrice?: number; venueRejectionReason?: string }; showApprovalStatus?: boolean }) => {
   const navigate = useNavigate();
+  
+  const getApprovalBadge = () => {
+    if (!showApprovalStatus || !meetup.approvalStatus) return null;
+    
+    if (meetup.approvalStatus === 'pending') {
+      return (
+        <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50">
+          <Clock className="w-3 h-3 mr-1" />
+          Pending Approval
+        </Badge>
+      );
+    }
+    if (meetup.approvalStatus === 'approved') {
+      return (
+        <Badge variant="outline" className="border-green-500 text-green-600 bg-green-50">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Approved
+        </Badge>
+      );
+    }
+    if (meetup.approvalStatus === 'rejected') {
+      return (
+        <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50">
+          <XCircle className="w-3 h-3 mr-1" />
+          Rejected
+        </Badge>
+      );
+    }
+    return null;
+  };
   
   return (
     <motion.div
@@ -70,18 +101,42 @@ const MeetupItem = ({ meetup }: { meetup: typeof upcomingMeetups[0] }) => {
     >
       <div className="relative h-32">
         <img src={meetup.image} alt={meetup.title} className="w-full h-full object-cover" />
-        {meetup.isHost ? (
-          <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
-            Host
-          </span>
-        ) : (
-          <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
-            Guest
-          </span>
-        )}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {meetup.isHost ? (
+            <span className="px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+              Host
+            </span>
+          ) : (
+            <span className="px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
+              Guest
+            </span>
+          )}
+          {getApprovalBadge()}
+        </div>
       </div>
       <div className="p-4">
         <h3 className="font-semibold text-foreground">{meetup.title}</h3>
+        {showApprovalStatus && meetup.approvalStatus === 'pending' && (
+          <div className="mt-2 p-2 rounded-lg bg-orange-50 border border-orange-200">
+            <p className="text-xs text-orange-800 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Waiting for venue approval
+            </p>
+          </div>
+        )}
+        {showApprovalStatus && meetup.approvalStatus === 'rejected' && meetup.venueRejectionReason && (
+          <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-xs text-red-800 font-medium mb-1">Rejection Reason:</p>
+            <p className="text-xs text-red-700">{meetup.venueRejectionReason}</p>
+          </div>
+        )}
+        {showApprovalStatus && meetup.approvalStatus === 'approved' && meetup.venueApprovedPrice && (
+          <div className="mt-2 p-2 rounded-lg bg-green-50 border border-green-200">
+            <p className="text-xs text-green-800">
+              Approved price: <span className="font-semibold">${meetup.venueApprovedPrice}</span>
+            </p>
+          </div>
+        )}
         <div className="mt-2 space-y-1">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="w-4 h-4" />
@@ -177,12 +232,20 @@ const MyMeetupsPage = () => {
       </div>
 
       <div className="px-4 pb-4">
-        <Tabs defaultValue="upcoming" className="mt-2">
-          <TabsList className="grid w-full grid-cols-2 bg-muted rounded-xl p-1 h-12">
-            <TabsTrigger value="upcoming" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
+        <Tabs defaultValue="pending" className="mt-2">
+          <TabsList className="grid w-full grid-cols-3 bg-muted rounded-xl p-1 h-12">
+            <TabsTrigger value="pending" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs">
+              Pending
+              {pendingApprovalMeetups.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
+                  {pendingApprovalMeetups.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="upcoming" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs">
               Upcoming
             </TabsTrigger>
-            <TabsTrigger value="past" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            <TabsTrigger value="past" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs">
               Past
             </TabsTrigger>
           </TabsList>
@@ -200,7 +263,7 @@ const MyMeetupsPage = () => {
               </div>
             ) : upcomingMeetups.length > 0 ? (
               upcomingMeetups.map((meetup) => (
-                <MeetupItem key={meetup.id} meetup={meetup} />
+                <MeetupItem key={meetup.id} meetup={meetup} showApprovalStatus={meetup.approvalStatus === 'approved'} />
               ))
             ) : (
               <div className="text-center py-12">
