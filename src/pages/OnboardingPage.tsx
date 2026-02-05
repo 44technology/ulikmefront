@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API_ENDPOINTS, apiRequest } from '@/lib/api';
 
-type OnboardingStep = 'welcome' | 'method' | 'phone' | 'name' | 'birthday' | 'gender' | 'lookingFor' | 'interests' | 'bio' | 'photos' | 'selfie' | 'complete';
+type OnboardingStep = 'welcome' | 'method' | 'phone' | 'otp' | 'name' | 'birthday' | 'gender' | 'lookingFor' | 'interests' | 'bio' | 'photos' | 'selfie' | 'complete';
 
 // Mexico cities for location preference (optional)
 const mexicoCities = [
@@ -158,7 +158,12 @@ const messages: Record<OnboardingStep, string[]> = {
   phone: [
     "Perfect!",
     "What's your phone number?",
-    "We'll verify it automatically.",
+    "We'll send you a verification code.",
+  ],
+  otp: [
+    "Great!",
+    "We've sent a verification code to your phone.",
+    "Enter the code below to verify your number.",
   ],
   name: [
     "Perfect! Let's start with the basics.",
@@ -217,6 +222,8 @@ const OnboardingPage = () => {
   const [showInput, setShowInput] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<string>('');
   const [phone, setPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -309,21 +316,44 @@ const OnboardingPage = () => {
     try {
       const formattedPhone = phone.startsWith('+') ? phone : `+1${phone.replace(/\D/g, '')}`;
       
-      // Skip OTP verification - directly verify with dummy code
-      const response = await verifyOTP(formattedPhone, '123456');
-      
-      // Phone verified - always continue to profile setup
-      toast.success('Phone verified! Please complete your profile.');
-      setStep('name');
+      // In production, this would call the OTP send API
+      // For now, simulate sending OTP
+      toast.success('Verification code sent!');
+      setOtpSent(true);
+      setStep('otp');
     } catch (error: any) {
-      console.error('Phone verification error:', error);
-      toast.error(error.message || 'Failed to verify phone number');
+      console.error('OTP send error:', error);
+      toast.error(error.message || 'Failed to send verification code');
     } finally {
       setLoading(false);
     }
   };
 
-  // OTP verification removed - phone number is automatically verified
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      toast.error('Please enter a valid 6-digit code');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formattedPhone = phone.startsWith('+') ? phone : `+1${phone.replace(/\D/g, '')}`;
+      
+      // Verify OTP (in production, this would validate the actual code)
+      // For mockup, accept any 6-digit code or '123456'
+      const response = await verifyOTP(formattedPhone, otpCode);
+      
+      // Phone verified - continue to profile setup
+      toast.success('Phone verified! Please complete your profile.');
+      setStep('name');
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      toast.error(error.message || 'Invalid verification code. Please try again.');
+      setOtpCode('');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNameNext = () => {
     // Split name into first and last name
@@ -494,7 +524,7 @@ const OnboardingPage = () => {
   };
 
   const handleNext = () => {
-    const steps: OnboardingStep[] = ['welcome', 'method', 'phone', 'name', 'birthday', 'gender', 'lookingFor', 'interests', 'photos', 'selfie', 'bio', 'complete'];
+    const steps: OnboardingStep[] = ['welcome', 'method', 'phone', 'otp', 'name', 'birthday', 'gender', 'lookingFor', 'interests', 'photos', 'selfie', 'bio', 'complete'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex < steps.length - 1) {
       const nextStep = steps[currentIndex + 1];
@@ -666,7 +696,7 @@ const OnboardingPage = () => {
               disabled={loading || !phone}
               className="w-full bg-gradient-primary h-12 text-lg font-semibold"
             >
-              {loading ? 'Verifying...' : 'Continue'}
+              {loading ? 'Sending...' : 'Send Verification Code'}
             </Button>
             <button
               onClick={() => setStep('welcome')}
@@ -677,7 +707,80 @@ const OnboardingPage = () => {
           </div>
         );
 
-      // OTP step removed - phone verification is automatic
+      case 'otp':
+        return (
+          <div className="space-y-4 mt-4">
+            <div className="text-center mb-4">
+              <p className="text-sm text-muted-foreground mb-2">
+                Code sent to {phone}
+              </p>
+              <div className="flex justify-center gap-2">
+                {[0, 1, 2, 3, 4, 5].map((index) => (
+                  <Input
+                    key={index}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={otpCode[index] || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      if (value.length <= 1) {
+                        const newCode = otpCode.split('');
+                        newCode[index] = value;
+                        setOtpCode(newCode.join('').slice(0, 6));
+                        
+                        // Auto-focus next input
+                        if (value && index < 5) {
+                          const nextInput = document.getElementById(`otp-${index + 1}`);
+                          nextInput?.focus();
+                        }
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+                        const prevInput = document.getElementById(`otp-${index - 1}`);
+                        prevInput?.focus();
+                      }
+                    }}
+                    id={`otp-${index}`}
+                    className="w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    disabled={loading}
+                  />
+                ))}
+              </div>
+            </div>
+            <Button
+              onClick={handleVerifyOTP}
+              disabled={loading || otpCode.length !== 6}
+              className="w-full bg-gradient-primary h-12 text-lg font-semibold"
+            >
+              {loading ? 'Verifying...' : 'Verify Code'}
+            </Button>
+            <div className="flex items-center justify-between text-sm">
+              <button
+                onClick={() => {
+                  setStep('phone');
+                  setOtpCode('');
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Change number
+              </button>
+              <button
+                onClick={handleSendOTP}
+                disabled={loading}
+                className="text-primary hover:underline font-medium"
+              >
+                Resend code
+              </button>
+            </div>
+            <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <p className="text-xs text-center text-blue-600">
+                💡 For testing, you can use any 6-digit code or '123456'
+              </p>
+            </div>
+          </div>
+        );
 
       case 'name':
         return (
