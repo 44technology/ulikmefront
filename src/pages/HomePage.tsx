@@ -459,197 +459,6 @@ const HomePage = () => {
           </div>
         </section>
 
-        {/* Expert-Led Classes Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Expert-Led Classes</h2>
-              <p className="text-sm text-muted-foreground mt-1">Real entrepreneurs teaching real results. Connect through learning.</p>
-            </div>
-            <motion.button
-              onClick={() => navigate('/classes')}
-              className="text-primary text-sm font-medium flex items-center gap-1"
-              whileTap={{ scale: 0.95 }}
-            >
-              View All
-              <ChevronRight className="w-4 h-4" />
-            </motion.button>
-          </div>
-          
-          {/* Featured Classes - Card Format */}
-          <div className="space-y-4">
-            {allClassesLoading ? (
-              <div className="text-center py-8">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-8 h-8 mx-auto mb-4 rounded-full border-4 border-primary/20 border-t-primary"
-                />
-                <p className="text-muted-foreground">Loading classes...</p>
-              </div>
-            ) : formattedClasses && formattedClasses.length > 0 ? (
-              formattedClasses.map((classItem: any, index: number) => (
-                <ClassCard
-                  key={classItem.id}
-                  {...classItem}
-                  isEnrolled={classItem.isEnrolled}
-                  isPopular={classItem.isPopular}
-                  recentEnrollments={classItem.recentEnrollments}
-                  onClick={() => navigate(`/class/${classItem.id}`)}
-                  onEnroll={(e) => {
-                    e?.stopPropagation();
-                    if (classItem.isEnrolled) {
-                      navigate(`/class/${classItem.id}`);
-                    } else {
-                      navigate(`/class/${classItem.id}`);
-                    }
-                  }}
-                />
-              ))
-            ) : (
-              <motion.button
-                onClick={() => navigate('/classes')}
-                className="w-full p-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 hover:border-primary/40 transition-all group"
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                    <GraduationCap className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-bold text-foreground text-base">Explore Expert-Led Classes</h3>
-                    <p className="text-xs text-muted-foreground">Connect through learning and shared progress</p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
-              </motion.button>
-            )}
-          </div>
-        </section>
-
-        {/* My Vibes & Classes Section */}
-        {myVibesAndClasses.length > 0 && (
-          <section>
-            <motion.button
-              onClick={() => navigate('/my-meetups')}
-              className="flex items-center justify-between w-full mb-4 group"
-            >
-              <h2 className="text-xl font-bold text-foreground">My Vibes & Classes</h2>
-              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-            </motion.button>
-            <div className="space-y-3">
-              <AnimatePresence>
-                {myVibesAndClasses.slice(0, 3).map((item: any, index: number) => {
-                  const isClass = item.type === 'class';
-                  const hostName = isClass 
-                    ? (item.instructor?.displayName || item.venue?.name || 'Instructor')
-                    : (item.host?.name || item.creator?.displayName || 
-                        (item.creator ? `${item.creator.firstName} ${item.creator.lastName}` : 'You'));
-                  const isYou = isAuthenticated && user && (
-                    !isClass && (item.host?.id === user.id || item.creator?.id === user.id)
-                  );
-                  
-                  return (
-                    <motion.div
-                      key={`${item.type}-${item.id}`}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => navigate(isClass ? `/class/${item.id}` : `/meetup/${item.id}`)}
-                      className="flex gap-4 p-3 rounded-2xl hover:bg-muted/30 transition-colors cursor-pointer group"
-                    >
-                      {/* Image */}
-                      <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
-                        {item.image ? (
-                          <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                            <span className="text-2xl">{isClass ? '📚' : (item.categoryEmoji || '🎉')}</span>
-                          </div>
-                        )}
-                        {isClass && (
-                          <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-primary/90 flex items-center justify-center">
-                            <GraduationCap className="w-3 h-3 text-primary-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          {isClass && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                              Class
-                            </span>
-                          )}
-                          {(item.isSurprise || item.isFromDice) && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400/20 to-orange-500/20 border border-yellow-400/30 text-yellow-600 dark:text-yellow-400 font-bold flex items-center gap-1">
-                              <span>🎲</span>
-                              <span>Surprise</span>
-                            </span>
-                          )}
-                          <p className={`text-sm font-medium ${isYou ? 'text-primary' : 'text-primary'}`}>
-                            {isYou ? 'You' : hostName}
-                          </p>
-                        </div>
-                        <h3 className="text-base font-bold text-foreground mb-2 line-clamp-1 group-hover:text-primary transition-colors">
-                          {item.title}
-                        </h3>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5" />
-                              <span>
-                                {item.date || (item.startTime ? formatDate(item.startTime) : 'TBD')}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span className="text-[#FF8C00] font-semibold">
-                                {item.time || (item.startTime ? formatTime(item.startTime) : 'TBD')}
-                              </span>
-                            </div>
-                            {/* Capacity info */}
-                            {(isClass ? (item.maxStudents || item._count?.enrollments) : (item.maxAttendees || item._count?.members)) && (
-                              <div className="flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5" />
-                                <span>
-                                  {isClass
-                                    ? `${item._count?.enrollments || 0}${item.maxStudents ? `/${item.maxStudents}` : ''}`
-                                    : `${item._count?.members || 0}${item.maxAttendees ? `/${item.maxAttendees}` : ''}`
-                                  }
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground line-clamp-1">
-                              {isClass 
-                                ? (item.venue?.name || item.venue?.address || 'Online Class')
-                                : (item.location || item.venue?.name || item.venue || 'Location TBD')
-                              }
-                            </span>
-                            <motion.button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(isClass ? `/class/${item.id}` : `/meetup/${item.id}`);
-                              }}
-                              className="ml-auto w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors"
-                            >
-                              <ArrowRight className="w-3 h-3 text-primary" />
-                            </motion.button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          </section>
-        )}
-
         {/* Discover Section */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -801,6 +610,197 @@ const HomePage = () => {
             </TabsContent>
           </Tabs>
         </section>
+
+        {/* Classes Section */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Classes</h2>
+              <p className="text-sm text-muted-foreground mt-1">Real entrepreneurs teaching real results. Connect through learning.</p>
+            </div>
+            <motion.button
+              onClick={() => navigate('/classes')}
+              className="text-primary text-sm font-medium flex items-center gap-1"
+              whileTap={{ scale: 0.95 }}
+            >
+              View All
+              <ChevronRight className="w-4 h-4" />
+            </motion.button>
+          </div>
+          
+          {/* Featured Classes - Card Format */}
+          <div className="space-y-4">
+            {allClassesLoading ? (
+              <div className="text-center py-8">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-8 h-8 mx-auto mb-4 rounded-full border-4 border-primary/20 border-t-primary"
+                />
+                <p className="text-muted-foreground">Loading classes...</p>
+              </div>
+            ) : formattedClasses && formattedClasses.length > 0 ? (
+              formattedClasses.map((classItem: any, index: number) => (
+                <ClassCard
+                  key={classItem.id}
+                  {...classItem}
+                  isEnrolled={classItem.isEnrolled}
+                  isPopular={classItem.isPopular}
+                  recentEnrollments={classItem.recentEnrollments}
+                  onClick={() => navigate(`/class/${classItem.id}`)}
+                  onEnroll={(e) => {
+                    e?.stopPropagation();
+                    if (classItem.isEnrolled) {
+                      navigate(`/class/${classItem.id}`);
+                    } else {
+                      navigate(`/class/${classItem.id}`);
+                    }
+                  }}
+                />
+              ))
+            ) : (
+              <motion.button
+                onClick={() => navigate('/classes')}
+                className="w-full p-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 hover:border-primary/40 transition-all group"
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                    <GraduationCap className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-bold text-foreground text-base">Explore Classes</h3>
+                    <p className="text-xs text-muted-foreground">Connect through learning and shared progress</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+              </motion.button>
+            )}
+          </div>
+        </section>
+
+        {/* My Vibes & Classes Section */}
+        {myVibesAndClasses.length > 0 && (
+          <section>
+            <motion.button
+              onClick={() => navigate('/my-meetups')}
+              className="flex items-center justify-between w-full mb-4 group"
+            >
+              <h2 className="text-xl font-bold text-foreground">My Vibes & Classes</h2>
+              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </motion.button>
+            <div className="space-y-3">
+              <AnimatePresence>
+                {myVibesAndClasses.slice(0, 3).map((item: any, index: number) => {
+                  const isClass = item.type === 'class';
+                  const hostName = isClass 
+                    ? (item.instructor?.displayName || item.venue?.name || 'Instructor')
+                    : (item.host?.name || item.creator?.displayName || 
+                        (item.creator ? `${item.creator.firstName} ${item.creator.lastName}` : 'You'));
+                  const isYou = isAuthenticated && user && (
+                    !isClass && (item.host?.id === user.id || item.creator?.id === user.id)
+                  );
+                  
+                  return (
+                    <motion.div
+                      key={`${item.type}-${item.id}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => navigate(isClass ? `/class/${item.id}` : `/meetup/${item.id}`)}
+                      className="flex gap-4 p-3 rounded-2xl hover:bg-muted/30 transition-colors cursor-pointer group"
+                    >
+                      {/* Image */}
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        {item.image ? (
+                          <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                            <span className="text-2xl">{isClass ? '📚' : (item.categoryEmoji || '🎉')}</span>
+                          </div>
+                        )}
+                        {isClass && (
+                          <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-primary/90 flex items-center justify-center">
+                            <GraduationCap className="w-3 h-3 text-primary-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {isClass && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                              Class
+                            </span>
+                          )}
+                          {(item.isSurprise || item.isFromDice) && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400/20 to-orange-500/20 border border-yellow-400/30 text-yellow-600 dark:text-yellow-400 font-bold flex items-center gap-1">
+                              <span>🎲</span>
+                              <span>Surprise</span>
+                            </span>
+                          )}
+                          <p className={`text-sm font-medium ${isYou ? 'text-primary' : 'text-primary'}`}>
+                            {isYou ? 'You' : hostName}
+                          </p>
+                        </div>
+                        <h3 className="text-base font-bold text-foreground mb-2 line-clamp-1 group-hover:text-primary transition-colors">
+                          {item.title}
+                        </h3>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>
+                                {item.date || (item.startTime ? formatDate(item.startTime) : 'TBD')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span className="text-[#FF8C00] font-semibold">
+                                {item.time || (item.startTime ? formatTime(item.startTime) : 'TBD')}
+                              </span>
+                            </div>
+                            {/* Capacity info */}
+                            {(isClass ? (item.maxStudents || item._count?.enrollments) : (item.maxAttendees || item._count?.members)) && (
+                              <div className="flex items-center gap-1">
+                                <Users className="w-3.5 h-3.5" />
+                                <span>
+                                  {isClass
+                                    ? `${item._count?.enrollments || 0}${item.maxStudents ? `/${item.maxStudents}` : ''}`
+                                    : `${item._count?.members || 0}${item.maxAttendees ? `/${item.maxAttendees}` : ''}`
+                                  }
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground line-clamp-1">
+                              {isClass 
+                                ? (item.venue?.name || item.venue?.address || 'Online Class')
+                                : (item.location || item.venue?.name || item.venue || 'Location TBD')
+                              }
+                            </span>
+                            <motion.button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(isClass ? `/class/${item.id}` : `/meetup/${item.id}`);
+                              }}
+                              className="ml-auto w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors"
+                            >
+                              <ArrowRight className="w-3 h-3 text-primary" />
+                            </motion.button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Create Story Modal */}
