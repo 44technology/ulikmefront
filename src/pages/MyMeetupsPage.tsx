@@ -177,16 +177,56 @@ const MyMeetupsPage = () => {
     return false;
   }) || [];
   
-  console.log('User meetups:', userMeetups);
-  console.log('All meetups:', allMeetups);
-  console.log('User:', user);
-  
-  // Separate upcoming and past meetups
+  // Separate meetups by status and time
   const now = new Date();
+  
+  // Pending approval meetups (only user-created ones)
+  const pendingApprovalMeetups = userMeetups.filter(meetup => {
+    if (meetup.creator?.id !== user?.id) return false;
+    return meetup.status === 'PENDING_APPROVAL' || meetup.venueApprovalStatus === 'pending';
+  }).map(meetup => ({
+    id: meetup.id,
+    title: meetup.title || 'Untitled Vibe',
+    venue: meetup.venue?.name || meetup.location || 'Location TBD',
+    date: meetup.startTime ? new Date(meetup.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
+    time: meetup.startTime ? new Date(meetup.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBD',
+    attendees: meetup._count?.members || meetup.members?.length || 0,
+    maxAttendees: meetup.maxAttendees || 10,
+    image: meetup.image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+    isHost: true,
+    approvalStatus: meetup.venueApprovalStatus || (meetup.status === 'PENDING_APPROVAL' ? 'pending' : undefined),
+    venueApprovedPrice: meetup.venueApprovedPrice,
+    venueRejectionReason: meetup.venueRejectionReason,
+  }));
+  
+  // Rejected meetups (only user-created ones)
+  const rejectedMeetups = userMeetups.filter(meetup => {
+    if (meetup.creator?.id !== user?.id) return false;
+    return meetup.status === 'REJECTED' || meetup.venueApprovalStatus === 'rejected';
+  }).map(meetup => ({
+    id: meetup.id,
+    title: meetup.title || 'Untitled Vibe',
+    venue: meetup.venue?.name || meetup.location || 'Location TBD',
+    date: meetup.startTime ? new Date(meetup.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
+    time: meetup.startTime ? new Date(meetup.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBD',
+    attendees: meetup._count?.members || meetup.members?.length || 0,
+    maxAttendees: meetup.maxAttendees || 10,
+    image: meetup.image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+    isHost: true,
+    approvalStatus: 'rejected',
+    venueApprovedPrice: meetup.venueApprovedPrice,
+    venueRejectionReason: meetup.venueRejectionReason,
+  }));
+  
+  // Upcoming meetups (approved or no venue)
   const upcomingMeetups = userMeetups.filter(meetup => {
     if (!meetup.startTime) return false;
     const startTime = new Date(meetup.startTime);
-    return startTime >= now;
+    if (startTime < now) return false;
+    // Exclude pending and rejected
+    if (meetup.status === 'PENDING_APPROVAL' || meetup.status === 'REJECTED') return false;
+    if (meetup.venueApprovalStatus === 'pending' || meetup.venueApprovalStatus === 'rejected') return false;
+    return true;
   }).map(meetup => ({
     id: meetup.id,
     title: meetup.title || 'Untitled Vibe',
@@ -197,8 +237,11 @@ const MyMeetupsPage = () => {
     maxAttendees: meetup.maxAttendees || 10,
     image: meetup.image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
     isHost: meetup.creator?.id === user?.id,
+    approvalStatus: meetup.venueApprovalStatus === 'approved' ? 'approved' : undefined,
+    venueApprovedPrice: meetup.venueApprovedPrice,
   }));
   
+  // Past meetups
   const pastMeetups = userMeetups.filter(meetup => {
     if (!meetup.startTime) return false;
     const startTime = new Date(meetup.startTime);
@@ -249,6 +292,39 @@ const MyMeetupsPage = () => {
               Past
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="pending" className="mt-4 space-y-4">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            ) : pendingApprovalMeetups.length > 0 ? (
+              <>
+                {pendingApprovalMeetups.map((meetup) => (
+                  <MeetupItem key={meetup.id} meetup={meetup} showApprovalStatus={true} />
+                ))}
+                {rejectedMeetups.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-red-500" />
+                      Rejected Activities
+                    </h3>
+                    {rejectedMeetups.map((meetup) => (
+                      <MeetupItem key={meetup.id} meetup={meetup} showApprovalStatus={true} />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No pending approvals</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Activities waiting for venue approval will appear here
+                </p>
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="upcoming" className="mt-4 space-y-4">
             {isLoading ? (
