@@ -65,7 +65,6 @@ const venueTypes = [
   { id: 'cafe', label: 'Café', emoji: '☕' },
   { id: 'restaurant', label: 'Restaurant', emoji: '🍽️' },
   { id: 'bar', label: 'Bar', emoji: '🍸' },
-  { id: 'park', label: 'Park', emoji: '🌳' },
   { id: 'fitness', label: 'Fitness', emoji: '💪' },
   { id: 'entertainment', label: 'Entertainment', emoji: '🎬' },
 ];
