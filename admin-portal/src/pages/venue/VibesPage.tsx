@@ -20,7 +20,27 @@ type VibeTicket = {
   sold: number;
 };
 
+type PendingActivity = {
+  id: string;
+  title: string;
+  description: string;
+  pricePerPerson: number;
+  maxAttendees: number;
+  startTime: string;
+  endTime?: string;
+  location?: string;
+  creator: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName?: string;
+    avatar?: string;
+  };
+  createdAt: string;
+};
+
 export default function VibesPage() {
+  const navigate = useNavigate();
   const [vibes, setVibes] = useState([
     { 
       id: 1, 
@@ -49,13 +69,109 @@ export default function VibesPage() {
       ] as VibeTicket[],
     },
   ]);
+  const [pendingActivities, setPendingActivities] = useState<PendingActivity[]>([]);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<PendingActivity | null>(null);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [approvedPrice, setApprovedPrice] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [maxParticipants, setMaxParticipants] = useState('');
+
+  // Fetch pending activities for approval
+  useEffect(() => {
+    fetchPendingActivities();
+  }, []);
+
+  const fetchPendingActivities = async () => {
+    try {
+      // TODO: Replace with actual API call
+      // const response = await fetch('/api/meetups/venue/pending');
+      // const data = await response.json();
+      // setPendingActivities(data.data || []);
+      
+      // Mock data for now
+      const mockPending: PendingActivity[] = [
+        {
+          id: 'pending-1',
+          title: 'Yoga Session',
+          description: 'A relaxing yoga session for beginners',
+          pricePerPerson: 50,
+          maxAttendees: 15,
+          startTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          location: 'Main Hall',
+          creator: {
+            id: 'user-1',
+            firstName: 'Sarah',
+            lastName: 'Miller',
+            displayName: 'Sarah M.',
+            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          },
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        },
+      ];
+      setPendingActivities(mockPending);
+    } catch (error) {
+      console.error('Error fetching pending activities:', error);
+      toast.error('Failed to load pending activities');
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedActivity) return;
+
+    if (approvalAction === 'approve' && !approvedPrice) {
+      toast.error('Please enter a price');
+      return;
+    }
+
+    if (approvalAction === 'reject' && !rejectionReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // TODO: Replace with actual API call
+      // const response = await fetch(`/api/meetups/${selectedActivity.id}/venue-approval`, {
+      //   method: 'PUT',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     action: approvalAction,
+      //     approvedPrice: approvalAction === 'approve' ? parseFloat(approvedPrice) : undefined,
+      //     rejectionReason: approvalAction === 'reject' ? rejectionReason : undefined,
+      //   }),
+      // });
+      
+      // Mock success
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      toast.success(
+        approvalAction === 'approve' 
+          ? 'Activity approved successfully!' 
+          : 'Activity rejected successfully!'
+      );
+      
+      // Remove from pending list
+      setPendingActivities(prev => prev.filter(a => a.id !== selectedActivity.id));
+      setShowApprovalDialog(false);
+      setSelectedActivity(null);
+      setApprovedPrice('');
+      setRejectionReason('');
+    } catch (error) {
+      console.error('Error processing approval:', error);
+      toast.error('Failed to process approval');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!title.trim() || !description.trim() || !date || !time || !location || !maxParticipants) {
@@ -82,6 +198,14 @@ export default function VibesPage() {
     setMaxParticipants('');
     setIsDialogOpen(false);
     toast.success('Vibe created successfully!');
+  };
+
+  const openApprovalDialog = (activity: PendingActivity, action: 'approve' | 'reject') => {
+    setSelectedActivity(activity);
+    setApprovalAction(action);
+    setApprovedPrice(activity.pricePerPerson.toString());
+    setRejectionReason('');
+    setShowApprovalDialog(true);
   };
 
   return (
@@ -164,62 +288,174 @@ export default function VibesPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {vibes.map((vibe) => (
-          <Card 
-            key={vibe.id}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate(`/vibes/${vibe.id}`)}
-          >
-            <CardHeader>
-              <CardTitle>{vibe.title}</CardTitle>
-              <CardDescription>{vibe.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{vibe.date} at {vibe.time}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span>{vibe.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span>{vibe.currentParticipants}/{vibe.maxParticipants} participants</span>
-                  </div>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'pending' | 'approved')}>
+        <TabsList>
+          <TabsTrigger value="pending">
+            Pending Approval
+            {pendingActivities.length > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {pendingActivities.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="approved">Approved Vibes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          {pendingActivities.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No pending activities</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    User-created activities waiting for approval will appear here
+                  </p>
                 </div>
-                
-                {/* Tickets Preview */}
-                <div className="pt-3 border-t border-border">
-                  <div className="flex items-center gap-2">
-                    <Ticket className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-semibold">Tickets ({vibe.tickets?.length || 0})</span>
-                  </div>
-                  {vibe.tickets && vibe.tickets.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {vibe.tickets.slice(0, 2).map((ticket) => (
-                        <div key={ticket.id} className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {ticket.type === 'paid' ? `$${ticket.price}` : 'Free'}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {ticket.sold} / {ticket.available} sold
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {pendingActivities.map((activity) => (
+                <Card key={activity.id} className="border-2 border-orange-500/20">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{activity.title}</CardTitle>
+                        <CardDescription className="mt-1 line-clamp-2">
+                          {activity.description}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline" className="border-orange-500 text-orange-600">
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Created by:</span>
+                          <span className="font-medium">
+                            {activity.creator.displayName || `${activity.creator.firstName} ${activity.creator.lastName}`}
                           </span>
                         </div>
-                      ))}
-                      {vibe.tickets.length > 2 && (
-                        <p className="text-xs text-muted-foreground">+{vibe.tickets.length - 2} more</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <DollarSign className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Requested Price:</span>
+                          <span className="font-semibold text-foreground">${activity.pricePerPerson}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Max Attendees:</span>
+                          <span className="font-medium">{activity.maxAttendees}</span>
+                        </div>
+                        {activity.location && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">{activity.location}</span>
+                          </div>
+                        )}
+                        {activity.startTime && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {new Date(activity.startTime).toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 pt-3 border-t border-border">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-green-500 text-green-600 hover:bg-green-50"
+                          onClick={() => openApprovalDialog(activity, 'approve')}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
+                          onClick={() => openApprovalDialog(activity, 'reject')}
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="approved" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {vibes.map((vibe) => (
+              <Card 
+                key={vibe.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/vibes/${vibe.id}`)}
+              >
+                <CardHeader>
+                  <CardTitle>{vibe.title}</CardTitle>
+                  <CardDescription>{vibe.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span>{vibe.date} at {vibe.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <span>{vibe.location}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <span>{vibe.currentParticipants}/{vibe.maxParticipants} participants</span>
+                      </div>
+                    </div>
+                    
+                    {/* Tickets Preview */}
+                    <div className="pt-3 border-t border-border">
+                      <div className="flex items-center gap-2">
+                        <Ticket className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold">Tickets ({vibe.tickets?.length || 0})</span>
+                      </div>
+                      {vibe.tickets && vibe.tickets.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {vibe.tickets.slice(0, 2).map((ticket) => (
+                            <div key={ticket.id} className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">
+                                {ticket.type === 'paid' ? `$${ticket.price}` : 'Free'}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {ticket.sold} / {ticket.available} sold
+                              </span>
+                            </div>
+                          ))}
+                          {vibe.tickets.length > 2 && (
+                            <p className="text-xs text-muted-foreground">+{vibe.tickets.length - 2} more</p>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
       </Tabs>
@@ -251,6 +487,12 @@ export default function VibesPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Max Attendees:</span>
                     <span className="font-medium">{selectedActivity.maxAttendees}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Created by:</span>
+                    <span className="font-medium">
+                      {selectedActivity.creator.displayName || `${selectedActivity.creator.firstName} ${selectedActivity.creator.lastName}`}
+                    </span>
                   </div>
                 </div>
               </div>
