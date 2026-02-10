@@ -224,6 +224,14 @@ function AppRoutes() {
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
         />
         <Route
+          path="/signup/venue"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <VenueSignupPage />}
+        />
+        <Route
+          path="/signup/instructor"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <InstructorSignupPage />}
+        />
+        <Route
           path="/*"
           element={
             isAuthenticated ? (
