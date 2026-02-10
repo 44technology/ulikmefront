@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, X, Globe, Lock, Camera, Instagram, Twitter, Youtube, Users } from 'lucide-react';
+import { ArrowLeft, Upload, X, Globe, Lock, Camera } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
