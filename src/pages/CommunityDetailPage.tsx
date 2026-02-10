@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Users, Plus, GraduationCap, Settings, Globe, Lock, Calendar, MapPin, Clock, DollarSign, User } from 'lucide-react';
+import { ArrowLeft, Users, Plus, GraduationCap, Settings, Globe, Lock, Calendar, MapPin, Clock, DollarSign, User, Send, AlertCircle } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import BottomNav from '@/components/layout/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export default function CommunityDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showCreateClassDialog, setShowCreateClassDialog] = useState(false);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'classes' | 'members'>('classes');
   
@@ -56,6 +57,13 @@ export default function CommunityDetailPage() {
   const [community, setCommunity] = useState<Community | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  
+  // User's social media followers count (from user profile)
+  const userFollowers = user?.socialMediaFollowers || 0;
+  const canCreateClasses = user?.canCreateClasses || false;
+  const hasRequestedClassCreation = user?.classCreationRequestStatus === 'pending';
+  const classRequestApproved = user?.classCreationRequestStatus === 'approved';
+  const canDirectlyCreateClass = canCreateClasses || classRequestApproved;
   
   const [classFormData, setClassFormData] = useState({
     title: '',
@@ -72,6 +80,41 @@ export default function CommunityDetailPage() {
   const handleClassFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setClassFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRequestClassCreation = async () => {
+    if (userFollowers < 5000) {
+      toast.error('You need at least 5,000 followers to request class creation');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/users/request-class-creation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          communityId: id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send request');
+      }
+
+      toast.success('Request sent to admin! You will be notified once approved.');
+      setShowRequestDialog(false);
+      // TODO: Refresh user data
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send request');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCreateClass = async (e: React.FormEvent) => {
@@ -236,14 +279,53 @@ export default function CommunityDetailPage() {
               Join Community
             </Button>
           )}
-          {community.isMember && (
-            <Button
-              onClick={() => setShowCreateClassDialog(true)}
-              className="flex-1 bg-gradient-primary text-primary-foreground"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Class
-            </Button>
+          {community.isMember && community.isOwner && (
+            <>
+              {canDirectlyCreateClass ? (
+                <Button
+                  onClick={() => setShowCreateClassDialog(true)}
+                  className="flex-1 bg-gradient-primary text-primary-foreground"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Class
+                </Button>
+              ) : userFollowers >= 5000 ? (
+                <>
+                  {hasRequestedClassCreation ? (
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      disabled
+                    >
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      Request Pending
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setShowRequestDialog(true)}
+                      className="flex-1 bg-gradient-primary text-primary-foreground"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Request Class Creation
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 p-4 rounded-xl bg-muted border border-border">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
+                        Class Creation Not Available
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        You need at least 5,000 followers across your social media platforms to request class creation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -461,6 +543,43 @@ export default function CommunityDetailPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Class Creation Dialog */}
+      <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Class Creation</DialogTitle>
+            <DialogDescription>
+              You have {userFollowers.toLocaleString()} followers. Request admin approval to create classes in this community.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-muted border border-border">
+              <p className="text-sm text-muted-foreground">
+                Your request will be reviewed by our admin team. You'll be notified once a decision is made.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowRequestDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRequestClassCreation}
+                className="flex-1 bg-gradient-primary text-primary-foreground"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Sending...' : 'Send Request'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -13,6 +13,9 @@ interface User {
   photos?: string[];
   interests?: string[];
   lookingFor?: string[];
+  socialMediaFollowers?: number;
+  canCreateClasses?: boolean;
+  classCreationRequestStatus?: 'pending' | 'approved' | 'rejected' | null;
 }
 
 interface AuthContextType {

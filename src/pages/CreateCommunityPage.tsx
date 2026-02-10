@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, X, Globe, Lock, Camera } from 'lucide-react';
+import { ArrowLeft, Upload, X, Globe, Lock, Camera, Instagram, Twitter, Youtube, Users } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -78,8 +79,8 @@ export default function CreateCommunityPage() {
       }
 
       const result = await response.json();
-      toast.success('Community created successfully!');
-      navigate(`/community/${result.data.id}`);
+      setCreatedCommunityId(result.data.id);
+      setShowFollowerDialog(true);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create community');
     } finally {
@@ -228,6 +229,101 @@ export default function CreateCommunityPage() {
           {isLoading ? 'Creating...' : 'Create Community'}
         </Button>
       </form>
+
+      {/* Social Media Followers Dialog */}
+      <Dialog open={showFollowerDialog} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Social Media Followers</DialogTitle>
+            <DialogDescription>
+              How many followers do you have across your main social media platforms (Instagram, Twitter, YouTube, etc.)?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="followerCount">Total Followers</Label>
+              <Input
+                id="followerCount"
+                type="number"
+                placeholder="e.g., 10000"
+                value={followerCount}
+                onChange={(e) => setFollowerCount(e.target.value)}
+                min="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Add up your followers from Instagram, Twitter, YouTube, TikTok, etc.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-muted border border-border">
+              <p className="text-sm font-medium text-foreground mb-2">What this means:</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Less than 5,000: You can create communities</li>
+                <li>• 5,000 or more: You can request to create classes</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  // Skip - don't save follower count
+                  if (createdCommunityId) {
+                    navigate(`/community/${createdCommunityId}`);
+                  }
+                }}
+                className="flex-1"
+              >
+                Skip
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  if (!followerCount || parseInt(followerCount) < 0) {
+                    toast.error('Please enter a valid follower count');
+                    return;
+                  }
+
+                  try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/users/social-followers`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        socialMediaFollowers: parseInt(followerCount),
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to save follower count');
+                    }
+
+                    const followerCountNum = parseInt(followerCount);
+                    if (followerCountNum >= 5000) {
+                      toast.success('Follower count saved! You can now request to create classes.');
+                    } else {
+                      toast.success('Follower count saved! You can create communities.');
+                    }
+
+                    if (createdCommunityId) {
+                      navigate(`/community/${createdCommunityId}`);
+                    }
+                  } catch (error: unknown) {
+                    toast.error(error instanceof Error ? error.message : 'Failed to save follower count');
+                  }
+                }}
+                className="flex-1 bg-gradient-primary text-primary-foreground"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MobileLayout>
   );
 }
