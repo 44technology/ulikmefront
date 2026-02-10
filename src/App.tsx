@@ -34,6 +34,9 @@ import VenuePostsPage from "./pages/VenuePostsPage";
 import StoryViewPage from "./pages/StoryViewPage";
 import MyTicketsPage from "./pages/MyTicketsPage";
 import TicketDetailPage from "./pages/TicketDetailPage";
+import CommunitiesPage from "./pages/CommunitiesPage";
+import CreateCommunityPage from "./pages/CreateCommunityPage";
+import CommunityDetailPage from "./pages/CommunityDetailPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
