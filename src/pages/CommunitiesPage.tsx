@@ -29,8 +29,15 @@ export default function CommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   
   // TODO: Fetch communities from API
+  // Mock data for testing - remove when API is ready
   const [communities, setCommunities] = useState<Community[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Load communities on mount (mock for now)
+  useState(() => {
+    // TODO: Replace with actual API call
+    // For now, communities will be empty until API is ready
+  });
 
   const filteredCommunities = communities.filter(community =>
     community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

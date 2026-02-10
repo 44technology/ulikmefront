@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronRight, Plus, Calendar, Clock, MapPin, ArrowRight, GraduationCap, DollarSign, Ticket, Users } from 'lucide-react';
+import { Search, ChevronRight, Plus, Calendar, Clock, MapPin, ArrowRight, GraduationCap, DollarSign, Ticket, Users, Users2 } from 'lucide-react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import BottomNav from '@/components/layout/BottomNav';
 import { meetups as mockMeetups, venues as mockVenues } from '@/data/mockData';
@@ -678,6 +678,38 @@ const HomePage = () => {
             )}
           </div>
         </section>
+
+        {/* Communities Section */}
+        {isAuthenticated && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Communities</h2>
+                <p className="text-sm text-muted-foreground mt-1">Join or create communities to learn together</p>
+              </div>
+              <motion.button
+                onClick={() => navigate('/communities')}
+                className="text-primary text-sm font-medium flex items-center gap-1"
+                whileTap={{ scale: 0.95 }}
+              >
+                View All
+                <ChevronRight className="w-4 h-4" />
+              </motion.button>
+            </div>
+            
+            <motion.button
+              onClick={() => navigate('/create-community')}
+              className="w-full p-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center gap-2"
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users2 className="w-6 h-6 text-primary" />
+              </div>
+              <span className="font-medium text-foreground">Create Community</span>
+              <span className="text-xs text-muted-foreground">Start your own learning community</span>
+            </motion.button>
+          </section>
+        )}
 
         {/* My Vibes & Classes Section */}
         {myVibesAndClasses.length > 0 && (
