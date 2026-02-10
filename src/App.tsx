@@ -77,6 +77,9 @@ const App = () => (
             <Route path="/story/:id" element={<StoryViewPage />} />
             <Route path="/tickets" element={<MyTicketsPage />} />
             <Route path="/ticket/:ticketId" element={<TicketDetailPage />} />
+            <Route path="/communities" element={<CommunitiesPage />} />
+            <Route path="/create-community" element={<CreateCommunityPage />} />
+            <Route path="/community/:id" element={<CommunityDetailPage />} />
             {/* Mentors are now part of Classes - redirect old routes */}
             <Route path="/mentors" element={<ClassesPage />} />
             <Route path="/mentor/:id" element={<ClassDetailPage />} />

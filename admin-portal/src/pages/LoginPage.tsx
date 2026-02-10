@@ -132,26 +132,15 @@ export default function LoginPage() {
             <div className="text-center text-sm text-muted-foreground mb-4">
               <p>Don't have an account?</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/signup/venue')}
-                className="w-full"
-              >
-                <Building2 className="w-4 h-4 mr-2" />
-                Venue Signup
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/signup/instructor')}
-                className="w-full"
-              >
-                <GraduationCap className="w-4 h-4 mr-2" />
-                Instructor Signup
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/signup/venue')}
+              className="w-full"
+            >
+              <Building2 className="w-4 h-4 mr-2" />
+              Venue Signup
+            </Button>
           </div>
         </div>
       </div>

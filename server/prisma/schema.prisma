@@ -91,6 +91,8 @@ model User {
   badges          UserBadge[]  @relation("UserBadges")
   notifications   Notification[] @relation("UserNotifications")
   tickets         Ticket[]
+  createdCommunities Community[] @relation("CommunityCreator")
+  communityMemberships CommunityMember[]
 
   @@index([email])
   @@index([phone])
@@ -260,6 +262,43 @@ model Match {
   @@map("matches")
 }
 
+model Community {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  image       String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creatorId   String
+  creator     User     @relation("CommunityCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members     CommunityMember[]
+  classes     Class[]
+
+  @@index([creatorId])
+  @@index([isPublic])
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String   @id @default(uuid())
+  communityId String
+  userId      String
+  role        String   @default("member") // owner, moderator, member
+  joinedAt    DateTime @default(now())
+
+  // Relations
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId])
+  @@index([userId])
+  @@map("community_members")
+}
+
 model Class {
   id          String        @id @default(uuid())
   title       String
@@ -279,13 +318,16 @@ model Class {
   updatedAt   DateTime      @updatedAt
 
   // Relations
-  venueId     String
-  venue       Venue         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId     String?
+  venue       Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  communityId String?
+  community   Community?    @relation(fields: [communityId], references: [id], onDelete: SetNull)
   enrollments ClassEnrollment[]
   tickets     Ticket[]
   payments    Payment[]
 
   @@index([venueId])
+  @@index([communityId])
   @@index([skill])
   @@index([category])
   @@index([status])
