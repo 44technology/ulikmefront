@@ -27,6 +27,7 @@ import VenueEventDetailPage from './pages/venue/EventDetailPage';
 import VenueDiscountsPage from './pages/venue/DiscountsPage';
 import VenueAdsPage from './pages/venue/AdsPage';
 import VenueSettingsPage from './pages/venue/SettingsPage';
+import LocationsPage from './pages/venue/LocationsPage';
 import SettingsPage from './pages/SettingsPage';
 
 // Instructor pages
@@ -143,6 +144,7 @@ function AppRoutes() {
           <VenueLayout>
             <Routes>
               <Route path="/dashboard" element={<VenueDashboardPage />} />
+              <Route path="/locations" element={<LocationsPage />} />
               <Route path="/content" element={<VenueContentPage />} />
               <Route path="/chat" element={<VenueChatPage />} />
               <Route path="/classes" element={<VenueClassesPage />} />

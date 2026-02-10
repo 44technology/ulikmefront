@@ -36,6 +36,7 @@ const navigation: Array<{
   children?: Array<{ name: string; href: string; icon: LucideIcon }>;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Locations', href: '/locations', icon: MapPin },
   { name: 'Content', href: '/content', icon: Image },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Classes', href: '/classes', icon: GraduationCap },
